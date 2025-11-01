@@ -1,4 +1,4 @@
-Native Extended Library Open License (NEL-1.0)
+Native Extended IV Open License (NEL-1.0)
 
 Copyright (c) 2025 Lorenzo3024it
 
@@ -35,3 +35,41 @@ AUTHOR OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+----------------------------------------------------------------------------------------
+
+Licenza Open Source di Native Extended IV (NEL-1.0)
+
+Copyright (c) 2025 Lorenzo3024it
+
+Con la presente è concessa gratuitamente a chiunque ottenga una copia di questo software 
+e dei relativi file di documentazione (il "Software"), l’autorizzazione a utilizzare, copiare, 
+modificare, fondere, pubblicare e ridistribuire copie del Software, nel rispetto delle 
+seguenti condizioni:
+
+1. **Attribuzione**
+   L’autore originale, **Lorenzo3024it**, deve essere chiaramente citato in ogni 
+   distribuzione o lavoro derivato. Il progetto di base deve essere identificato come 
+   "Native Extended IV" di Lorenzo3024it.  
+   Qualsiasi modifica apportata deve essere dichiarata esplicitamente.
+
+2. **Uso Non Commerciale**
+   Il presente Software, comprese le versioni modificate o derivate, **non può essere venduto, 
+   concesso in licenza o monetizzato in alcun modo**.  
+   Ciò include, ma non si limita a: mod a pagamento, accesso tramite donazioni, sistemi a 
+   sottoscrizione o qualsiasi altro utilizzo con finalità commerciali dirette o indirette.
+
+3. **Distribuzione Open Source**
+   Qualsiasi versione modificata del Software resa pubblica deve includere **l’intero codice 
+   sorgente** ed essere distribuita sotto la **stessa licenza (NEL-1.0)**.  
+   Non è consentita la distribuzione di versioni solo compilate o chiuse al pubblico.
+
+4. **Ridstribuzione**
+   Ogni copia, originale o modificata, deve contenere il presente testo di licenza e l’avviso 
+   di copyright senza modifiche.
+
+IL SOFTWARE VIENE FORNITO "COSÌ COM'È", SENZA ALCUNA GARANZIA, ESPRESSA O IMPLICITA, 
+INCLUSE, MA NON LIMITATE A, LE GARANZIE DI COMMERCIABILITÀ, IDONEITÀ PER UNO SCOPO 
+PARTICOLARE E NON VIOLAZIONE DI DIRITTI. IN NESSUN CASO L’AUTORE O IL TITOLARE DEL COPYRIGHT 
+SARÀ RESPONSABILE PER DANNI, RICHIESTE O ALTRE RESPONSABILITÀ, DERIVANTI DA O CONNESSE ALL’USO 
+DEL SOFTWARE O DI ALTRI ELEMENTI CONTENUTI NEL SOFTWARE STESSO.
