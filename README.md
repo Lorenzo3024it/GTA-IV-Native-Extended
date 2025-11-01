@@ -1,4 +1,4 @@
-# Native Extended - GTA IV ScriptHookDotNet Library
+# Native Extended IV - ScriptHookDotNet for IV Library
 
 **Author:** Lorenzo3024IT  
 **License:** Custom Open Source License (see LICENSE.txt)
