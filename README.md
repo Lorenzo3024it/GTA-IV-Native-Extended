@@ -7,8 +7,7 @@
 
 ## 🔹 NativeAudio
 Handles game sound-related natives and structures.
-
-**GameSound (structure)** → Contains a list of predefined in-game sounds (will be expanded in future versions).
+- **GameSound (structure)** → Contains a list of predefined in-game sounds (will be expanded in future versions).
 
 ---
 
