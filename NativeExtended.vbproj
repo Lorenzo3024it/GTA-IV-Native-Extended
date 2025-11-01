@@ -7,7 +7,7 @@
     <ProjectGuid>{8805E440-877D-45C9-BE71-FD6204A3CD07}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>NativeExtended</RootNamespace>
-    <AssemblyName>NativeExtended</AssemblyName>
+    <AssemblyName>NativeExtended-IV</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>Windows</MyType>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
@@ -19,8 +19,10 @@
     <DefineDebug>true</DefineDebug>
     <DefineTrace>true</DefineTrace>
     <OutputPath>bin\Debug\</OutputPath>
-    <DocumentationFile>NativeExtended.xml</DocumentationFile>
+    <DocumentationFile>NativeExtended-IV.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DefineConstants>USE_SLIMDX</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -28,14 +30,14 @@
     <DefineTrace>true</DefineTrace>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>NativeExtended.xml</DocumentationFile>
+    <DocumentationFile>NativeExtended-IV.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
     <OptionExplicit>On</OptionExplicit>
   </PropertyGroup>
   <PropertyGroup>
-    <OptionCompare>Binary</OptionCompare>
+    <OptionCompare>Text</OptionCompare>
   </PropertyGroup>
   <PropertyGroup>
     <OptionStrict>Off</OptionStrict>
@@ -50,8 +52,12 @@
     <Reference Include="ScriptHookDotNet">
       <HintPath>..\..\..\Back To The Future IV\TimeTravel Script\Scripts\Riferimenti DLL\ScriptHookDotNet.dll</HintPath>
     </Reference>
+    <Reference Include="SlimDX">
+      <HintPath>..\Vehicle Gauges\DLL da installare\SlimDX.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -70,7 +76,19 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="scripts\Unused.vb" />
+    <Compile Include="scripts\Debug.vb" />
+    <Compile Include="scripts\Entity.vb" />
+    <Compile Include="scripts\Fire.vb" />
+    <Compile Include="scripts\Garage.vb" />
+    <Compile Include="scripts\Models.vb" />
+    <Compile Include="scripts\Scripts.vb" />
+    <Compile Include="scripts\PaynSpray.vb" />
+    <None Include="scripts\SpawnerHelper.vb" />
+    <Compile Include="scripts\TickHelper.vb" />
+    <Compile Include="scripts\Timer.vb" />
+    <Compile Include="scripts\Tools.vb" />
+    <Compile Include="scripts\World.vb" />
+    <None Include="scripts\z. Unused.vb" />
     <Compile Include="My Project\1.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">
@@ -89,22 +107,21 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="scripts\CustomHelpMessage.vb" />
-    <Compile Include="scripts\NativeAudioPlayer.vb" />
-    <Compile Include="scripts\NativeCamera.vb" />
-    <Compile Include="scripts\NativeDraws.vb" />
-    <Compile Include="scripts\NativeGeneric.vb" />
-    <Compile Include="scripts\NativeJoypad.vb" />
-    <Compile Include="scripts\NativeMouse.vb" />
-    <Compile Include="scripts\NativeObjects.vb" />
-    <Compile Include="scripts\NativePeds.vb" />
-    <Compile Include="scripts\NativePhone.vb" />
-    <Compile Include="scripts\NativePlayer.vb" />
-    <Compile Include="scripts\NativePolice.vb" />
-    <Compile Include="scripts\NativePTFX.vb" />
-    <Compile Include="scripts\NativeRadio.vb" />
-    <Compile Include="scripts\NativeTrains.vb" />
-    <Compile Include="scripts\NativeVehicles.vb" />
+    <Compile Include="scripts\Audio.vb" />
+    <Compile Include="scripts\Camera.vb" />
+    <Compile Include="scripts\Draws.vb" />
+    <Compile Include="scripts\Generic.vb" />
+    <Compile Include="scripts\Hud.vb" />
+    <Compile Include="scripts\Controls.vb" />
+    <Compile Include="scripts\Objects.vb" />
+    <Compile Include="scripts\Peds.vb" />
+    <Compile Include="scripts\Phone.vb" />
+    <Compile Include="scripts\Player.vb" />
+    <Compile Include="scripts\Police.vb" />
+    <Compile Include="scripts\PTFX.vb" />
+    <Compile Include="scripts\Radio.vb" />
+    <Compile Include="scripts\Trains.vb" />
+    <Compile Include="scripts\Vehicles.vb" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="My Project\Resources.resx">

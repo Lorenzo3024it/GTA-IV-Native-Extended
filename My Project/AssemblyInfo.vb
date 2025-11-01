@@ -9,10 +9,10 @@ Imports System.Runtime.InteropServices
 ' Controllare i valori degli attributi degli assembly
 
 <Assembly: AssemblyTitle("NativeExtended")>
-<Assembly: AssemblyDescription("")>
+<Assembly: AssemblyDescription("A lot of native function grouped for easy access and use.")>
 <Assembly: AssemblyCompany("")>
 <Assembly: AssemblyProduct("NativeExtended")>
-<Assembly: AssemblyCopyright("© Lorenzo3024it, 2025")>
+<Assembly: AssemblyCopyright("©2025 Lorenzo3024it")>
 <Assembly: AssemblyTrademark("")>
 
 <Assembly: ComVisible(False)>
@@ -28,5 +28,5 @@ Imports System.Runtime.InteropServices
 '      Revisione
 '
 
-<Assembly: AssemblyVersion("1.0")>
-<Assembly: AssemblyFileVersion("1.0")>
+<Assembly: AssemblyVersion("1.1.0")>
+<Assembly: AssemblyFileVersion("1.1.0")>
