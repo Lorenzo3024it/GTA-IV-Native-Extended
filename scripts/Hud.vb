@@ -3,6 +3,7 @@ Imports System.Security.Policy
 Imports GTA
 Imports GTA.Native.Function
 Imports NativeExtended
+Imports NativeExtended.NativeGarage
 ''' <summary>
 ''' Native HUD effects manager for flashing and persistent display elements.
 ''' Handles radar, weapon icon, GPS route, blips, HUD visibility, and interior radar display.
@@ -133,7 +134,104 @@ Public Class NativeHud
         InviteReceived = 10
     End Enum
 
+    '=============================
+    ' HIDE HUD AND RADAR
+    '=============================
+    Private Shared _hideHud As Boolean = False
+    Private Shared ReadOnly TickHideHud As New Action(AddressOf OnTickHideHud)
 
+    ''' <summary>
+    ''' Hides or shows HUD and radar every frame.
+    ''' </summary>
+    Public Shared Property HideHud As Boolean
+        Get
+            Return _hideHud
+        End Get
+        Set(value As Boolean)
+            If value = _hideHud Then Exit Property
+            _hideHud = value
+            If value Then
+                TickHelper.Add_Internal(TickHideHud)
+            Else
+                TickHelper.Remove_Internal(TickHideHud)
+            End If
+            End Set
+        End Property
+
+        Private Shared Sub OnTickHideHud()
+            [Call]("HIDE_HUD_AND_RADAR_THIS_FRAME")
+        End Sub
+
+
+    '=============================
+    ' DISPLAY RADAR AS INTERIOR
+    '=============================
+    Private Shared _displayRadarAsInterior As Boolean = False
+    Private Shared ReadOnly TickRadarInterior As New Action(AddressOf OnTickRadarAsInterior)
+
+    ''' <summary>
+    ''' Displays radar as if the player was inside an interior.
+    ''' </summary>
+    Public Shared Property DisplayRadarAsInterior As Boolean
+        Get
+            Return _displayRadarAsInterior
+        End Get
+        Set(value As Boolean)
+            If value = _displayRadarAsInterior Then Exit Property
+
+            _displayRadarAsInterior = value
+            If value Then
+                TickHelper.Add_Internal(TickRadarInterior)
+            Else
+                TickHelper.Remove_Internal(TickRadarInterior)
+            End If
+        End Set
+    End Property
+    '================================================================================================
+    Private Shared Sub OnTickRadarAsInterior()
+        [Call]("DISPLAY_RADAR_AS_INTERIOR_THIS_FRAME")
+    End Sub
+    Private Shared _displayAsInterior As Boolean = False
+    Private Shared _timerActive As Boolean = False
+    Private Shared _targetVisible As Boolean = True
+    Private Shared _delayTime As Integer = 0
+    Private Shared _timerStart As Integer = 0
+    Private Shared ReadOnly _tickTriggerHudState As New Action(AddressOf TriggerStateTick)
+    Public Shared Sub TriggerHudState(Visible As Boolean, Optional Time As Integer = 3000, Optional DisplayRadarAsInterior As Boolean = False)
+        ' Se il tempo è 0 → esegue subito
+        If Time <= 0 Then
+            _hideHud = Not Visible
+            _displayAsInterior = DisplayRadarAsInterior
+            Return
+        End If
+
+        ' Imposta i valori e avvia il timer
+        _targetVisible = Visible
+        _delayTime = Time
+        _displayAsInterior = DisplayRadarAsInterior
+        _timerStart = NativeTimer.TotalGameTime
+        _timerActive = True
+        If Not TickHelper.ContainsHandler_Internal(_tickTriggerHudState) Then
+            TickHelper.Add_Internal(_tickTriggerHudState)
+        End If
+    End Sub
+
+    Private Shared Sub TriggerStateTick()
+        If Not _timerActive Then Return
+
+        Dim elapsed As Integer = NativeTimer.TotalGameTime - _timerStart
+
+        If elapsed >= _delayTime Then
+            ' Cambia lo stato del HUD
+            _hideHud = Not _targetVisible
+            _timerActive = False
+
+            TickHelper.Remove_Internal(_tickTriggerHudState)
+        Else
+            If _hideHud Then [Call]("HIDE_HUD_AND_RADAR_THIS_FRAME")
+            If _displayAsInterior Then [Call]("DISPLAY_RADAR_AS_INTERIOR_THIS_FRAME")
+        End If
+    End Sub
 #End Region
 
 #Region "Debug tools"
@@ -170,7 +268,7 @@ Public Class NativeHud
 
     Private Shared Sub InternalStart(key As String, durationMs As Integer, Optional obj As Object = Nothing)
         SyncLock _lock
-            Dim now = NativeTimer.getTimerC()
+            Dim now = NativeTimer.TotalGameTime
             Dim endTime As Integer? = Nothing
 
             If durationMs = 0 Then
@@ -267,7 +365,7 @@ Public Class NativeHud
         End Sub
 
         Private Shared Sub Process()
-            Dim now = NativeTimer.getTimerC()
+            Dim now = NativeTimer.TotalGameTime
             Dim toRemove As New List(Of String)
 
             SyncLock _lock

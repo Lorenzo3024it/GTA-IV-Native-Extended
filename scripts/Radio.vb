@@ -26,9 +26,9 @@ Public Class NativeRadio
     Public Shared WriteOnly Property FreezeStation As Boolean
         Set(value As Boolean)
             If value = True Then
-                [Call]("FREEZE_RADIO_STATION")
+                [Call]("FREEZE_RADIO_STATION", CurrentStation.ToString)
             Else
-                [Call]("UNFREEZE_RADIO_STATION")
+                [Call]("UNFREEZE_RADIO_STATION", CurrentStation.ToString)
             End If
         End Set
     End Property
@@ -54,7 +54,6 @@ Public Class NativeRadio
             [Call]("DISABLE_FRONTEND_RADIO")
         End If
     End Sub
-    'FORCE_RADIO_TRACK( "VLADIVOSTOK", "RADIO_STATION_VLADIVOSTOK_INTRO_TRACK", 2, 9 )
     Public Shared Sub ForceRadioTrack(RadioStation As RadioStations, Track As String, Optional Unknown1 As Integer = 2, Optional Unknown2 As Integer = 9)
         [Call]("FORCE_RADIO_TRACK", RadioStation, Track, Unknown1, Unknown2)
     End Sub
@@ -197,6 +196,9 @@ Public Class NativeRadio
     Public Shared Sub SkipTrack()
         [Call]("SKIP_RADIO_FORWARD")
     End Sub
+    ''' <summary>
+    ''' List of IV Radio Stations' Hash name (.ToString) or Index (integer)
+    ''' </summary>
     Public Enum RadioStations
         THE_VIBE = 0
         LIBERTY_ROCK = 1
@@ -219,34 +221,37 @@ Public Class NativeRadio
         NDEPENDENT = 18
         INTEGRITY = 19
     End Enum
+
     'Public Shared Sub DisplayCurrentStationSprite_ThisFrame(Optional PositionX As Single = 0.0, Optional PositionY As Single = 0.05, Optional SizeX As Single = 0.1, Optional SizeY As Single = 0.1, Optional Rotation As Single = 0.0, Optional Alpha As Integer = 255)
     'End Sub
-    'Public Shared Sub DisableIntegrityRadioStation(Disable As Boolean)
-    '    If Disable Then [Call]("LOCK_LAZLOW_STATION") Else [Call]("UNLOCK_LAZLOW_STATION")
-    'End Sub
-    'Public Shared Function isIntegrityRadioStationDisabled() As Boolean
-    '    Return [Call](Of Boolean)("IS_LAZLOW_STATION_LOCKED")
-    'End Function
-    'Public Shared Sub FreezeRadioStation(Freeze As Boolean)
-    '    If Freeze Then [Call]("FREEZE_RADIO_STATION") Else [Call]("UNFREEZE_RADIO_STATION")
-    'End Sub
-    'Public Shared Sub DisplayHudInMobileRadio_MaybeNotWorking(Display As Boolean)
-    '    [Call]("RENDER_RADIOHUD_SPRITE_IN_MOBILE_PHONE", Display)
-    'End Sub
-    'Public Shared Function isRadioHudON() As Boolean
-    '    Return [Call](Of Boolean)("IS_RADIO_HUD_ON")
-    'End Function
-    'Public Shared Sub EnableMobileRadio(Enable As Boolean)
-    '    [Call]("SET_MOBILE_RADIO_ENABLED_DURING_GAMEPLAY", Enable)
-    '    [Call]("SET_MOBILE_PHONE_RADIO_STATE", Enable)
-    'End Sub
-    'Public Shared Function isMobileRadioActive() As Boolean
-    '    Return [Call](Of Boolean)("IS_MOBILE_PHONE_RADIO_ACTIVE")
-    'End Function
-    'Public Shared Function getCurrentRadioStation() As RadioStations
-    '    Return [Call](Of Integer)("GET_PLAYER_RADIO_STATION_INDEX")
-    'End Function
 End Class
+
+'FORCE_RADIO_TRACK( "VLADIVOSTOK", "RADIO_STATION_VLADIVOSTOK_INTRO_TRACK", 2, 9 )
+'Public Shared Sub DisableIntegrityRadioStation(Disable As Boolean)
+'    If Disable Then [Call]("LOCK_LAZLOW_STATION") Else [Call]("UNLOCK_LAZLOW_STATION")
+'End Sub
+'Public Shared Function isIntegrityRadioStationDisabled() As Boolean
+'    Return [Call](Of Boolean)("IS_LAZLOW_STATION_LOCKED")
+'End Function
+'Public Shared Sub FreezeRadioStation(Freeze As Boolean)
+'    If Freeze Then [Call]("FREEZE_RADIO_STATION") Else [Call]("UNFREEZE_RADIO_STATION")
+'End Sub
+'Public Shared Sub DisplayHudInMobileRadio_MaybeNotWorking(Display As Boolean)
+'    [Call]("RENDER_RADIOHUD_SPRITE_IN_MOBILE_PHONE", Display)
+'End Sub
+'Public Shared Function isRadioHudON() As Boolean
+'    Return [Call](Of Boolean)("IS_RADIO_HUD_ON")
+'End Function
+'Public Shared Sub EnableMobileRadio(Enable As Boolean)
+'    [Call]("SET_MOBILE_RADIO_ENABLED_DURING_GAMEPLAY", Enable)
+'    [Call]("SET_MOBILE_PHONE_RADIO_STATE", Enable)
+'End Sub
+'Public Shared Function isMobileRadioActive() As Boolean
+'    Return [Call](Of Boolean)("IS_MOBILE_PHONE_RADIO_ACTIVE")
+'End Function
+'Public Shared Function getCurrentRadioStation() As RadioStations
+'    Return [Call](Of Integer)("GET_PLAYER_RADIO_STATION_INDEX")
+'End Function
 
 
 

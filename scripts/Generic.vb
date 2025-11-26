@@ -10,6 +10,7 @@ Public Class NativeGeneric
     Public Shared ReadOnly Property isPauseMenuActive As Boolean
         Get
             Return [Call](Of Boolean)("IS_PAUSE_MENU_ACTIVE")
+
         End Get
     End Property
     Public Shared Sub DisablePauseMenu(Optional Disable As Boolean = True)
@@ -42,7 +43,7 @@ Public Class NativeGeneric
             If DontAffectCheatStatistic Then NativePlayer.Stats.DecrementInt(NativePlayer.Stats.StatINTs.IV_TimesCheated, 1)
         End Sub
         ''' <summary>
-        ''' Tested but I noticed no difference. Used only in elizabeta3 SCOCL script.
+        ''' Tested but I noticed no difference. Used only in elizabeta3 SCO script.
         ''' </summary>
         Public Shared Sub ActivateHeliSpeedCheat(Heli As Vehicle, Optional Activate As Boolean = True)
             [Call]("ACTIVATE_HELI_SPEED_CHEAT", Heli, Activate)
@@ -85,92 +86,95 @@ Public Class NativeGeneric
             EFLC_Unknown16
         End Enum
     End Class
-    Public Class DeletionList
-        Public Shared DeletionList_NonNative As List(Of NativeEntity) = New List(Of NativeEntity)
-        Public Property List As List(Of NativeEntity)
-        Public ReadOnly Property Count As Integer
-            Get
-                Return List.Count
-            End Get
-        End Property
-        Public Sub New()
-            List = New List(Of NativeEntity)
-        End Sub
-        Public Sub AddPed(Ped As Ped)
-            List.Add(New NativeEntity(Ped, EntityType.Ped))
-        End Sub
-        Public Sub AddCar(Car As Vehicle)
-            List.Add(New NativeEntity(Car, EntityType.Vehicle))
-        End Sub
-        Public Sub AddObject(Obj As GTA.Object)
-            List.Add(New NativeEntity(Obj, EntityType.Object))
-        End Sub
-        Public Sub AddCamera(Camera As GTA.Camera)
-            List.Add(New NativeEntity(Camera, EntityType.Camera))
-        End Sub
-        Public Sub Process(Optional ClearList As Boolean = True)
-            For i As Integer = List.Count - 1 To 0 Step -1
-                Dim entity As NativeEntity = List(i)
-                If entity.Exists Then
-                    entity.Delete()
-                End If
-                List.RemoveAt(i)
-            Next
-        End Sub
-        Public Sub ClearList()
-            List.Clear()
-        End Sub
-        Public Sub RemoveEntity(Entity As NativeEntity, Optional RemoveOnlyFromList As Boolean = True)
-            If Entity.Exists Then Entity.Delete()
-            List.Remove(Entity)
-        End Sub
-        Public Sub RemoveEntitiesByType(Type As EntityType)
-            For i As Integer = List.Count - 1 To 0 Step -1
-                Dim entity As NativeEntity = List(i)
-                If entity.Type = Type AndAlso entity.Exists Then
-                    entity.Delete()
-                    List.RemoveAt(i)
-                End If
-            Next
-        End Sub
-        Public Function AnyExists() As Boolean
-            Return List.Any(Function(e) e.Exists)
-        End Function
-        Public Function getEntitiesByType(Type As EntityType) As List(Of NativeEntity)
-            Return List.Where(Function(e) e.Type = Type).ToList()
-        End Function
-        '------------------------------------------------------------------------------------------------------------------------
-        Public Shared Sub AddPed(Ped As Ped, Optional UseNonNativeMethod As Boolean = True)
-            If UseNonNativeMethod Then
-                DeletionList_NonNative.Add(New NativeEntity(Ped, EntityType.Ped))
-            Else
-                [Call]("ADD_PED_TO_MISSION_DELETION_LIST", Ped, True)
-            End If
-        End Sub
-        Public Shared Sub AddCar(Car As Vehicle, Optional UseNonNativeMethod As Boolean = True)
-            If UseNonNativeMethod Then
-                DeletionList_NonNative.Add(New NativeEntity(Car, EntityType.Vehicle))
-            Else
-                [Call]("ADD_CAR_TO_MISSION_DELETION_LIST", Car)
-            End If
-        End Sub
-        Public Shared Sub AddObject_NonNative(Obj As GTA.Object)
-            DeletionList_NonNative.Add(New NativeEntity(Obj, EntityType.Object))
-        End Sub
-        Public Shared Sub AddCamera_NonNative(Camera As GTA.Camera)
-            DeletionList_NonNative.Add(New NativeEntity(Camera, EntityType.Camera))
-        End Sub
-        Public Shared Sub ProcessDeletionList(Optional NonNative As Boolean = True)
-            [Call]("PROCESS_MISSION_DELETION_LIST")
-            If NonNative Then
-                For i As Integer = DeletionList_NonNative.Count - 1 To 0 Step -1
-                    Dim entity As NativeEntity = DeletionList_NonNative(i)
-                    If entity.Exists Then
-                        entity.Delete()
-                    End If
-                    DeletionList_NonNative.RemoveAt(i)
-                Next
-            End If
-        End Sub
-    End Class
+    'Public Class DeletionList
+    '    Public Shared DeletionList_NonNative As List(Of NativeEntity) = New List(Of NativeEntity)
+    '    Public Property List As List(Of NativeEntity)
+    '    Public ReadOnly Property Count As Integer
+    '        Get
+    '            Return List.Count
+    '        End Get
+    '    End Property
+    '    Public Sub New()
+    '        List = New List(Of NativeEntity)
+    '    End Sub
+    '    Public Sub AddPed(Ped As Ped)
+    '        List.Add(New NativeEntity(Ped, EntityType.Ped))
+    '    End Sub
+    '    Public Sub AddCar(Car As Vehicle)
+    '        List.Add(New NativeEntity(Car, EntityType.Vehicle))
+    '    End Sub
+    '    Public Sub AddObject(Obj As GTA.Object)
+    '        List.Add(New NativeEntity(Obj, EntityType.Object))
+    '    End Sub
+    '    Public Sub AddCamera(Camera As GTA.Camera)
+    '        List.Add(New NativeEntity(Camera, EntityType.Camera))
+    '    End Sub
+    '    Public Sub Process(Optional ClearList As Boolean = True)
+    '        For i As Integer = List.Count - 1 To 0 Step -1
+    '            Dim entity As NativeEntity = List(i)
+    '            If entity.Exists Then
+    '                entity.Delete()
+    '            End If
+    '            List.RemoveAt(i)
+    '        Next
+    '    End Sub
+    '    Public Sub ClearList()
+    '        List.Clear()
+    '    End Sub
+    '    Public Sub RemoveEntity(Entity As NativeEntity, Optional RemoveOnlyFromList As Boolean = True)
+    '        If Entity.Exists Then Entity.Delete()
+    '        List.Remove(Entity)
+    '    End Sub
+    '    Public Sub RemoveEntitiesByType(Type As EntityType)
+    '        For i As Integer = List.Count - 1 To 0 Step -1
+    '            Dim entity As NativeEntity = List(i)
+    '            If entity.Type = Type AndAlso entity.Exists Then
+    '                entity.Delete()
+    '                List.RemoveAt(i)
+    '            End If
+    '        Next
+    '    End Sub
+    '    Public Function AnyExists() As Boolean
+    '        Return List.Any(Function(e) e.Exists)
+    '    End Function
+    '    Public Function getEntitiesByType(Type As EntityType) As List(Of NativeEntity)
+    '        Return List.Where(Function(e) e.Type = Type).ToList()
+    '    End Function
+    '    '------------------------------------------------------------------------------------------------------------------------
+    '    Public Shared Sub AddPed(Ped As Ped, Optional UseNonNativeMethod As Boolean = True)
+    '        If UseNonNativeMethod Then
+    '            DeletionList_NonNative.Add(New NativeEntity(Ped, EntityType.Ped))
+    '        Else
+    '            [Call]("ADD_PED_TO_MISSION_DELETION_LIST", Ped, True)
+    '        End If
+    '    End Sub
+    '    Public Shared Sub AddCar(Car As Vehicle, Optional UseNonNativeMethod As Boolean = True)
+    '        If UseNonNativeMethod Then
+    '            DeletionList_NonNative.Add(New NativeEntity(Car, EntityType.Vehicle))
+    '        Else
+    '            [Call]("ADD_CAR_TO_MISSION_DELETION_LIST", Car)
+    '        End If
+    '    End Sub
+    '    Public Shared Sub AddObject_NonNative(Obj As GTA.Object)
+    '        DeletionList_NonNative.Add(New NativeEntity(Obj, EntityType.Object))
+    '    End Sub
+    '    Public Shared Sub AddCamera_NonNative(Camera As GTA.Camera)
+    '        DeletionList_NonNative.Add(New NativeEntity(Camera, EntityType.Camera))
+    '    End Sub
+    '    Public Shared Sub ProcessDeletionList(Optional NonNative As Boolean = True)
+    '        [Call]("PROCESS_MISSION_DELETION_LIST")
+    '        If NonNative Then
+    '            For i As Integer = DeletionList_NonNative.Count - 1 To 0 Step -1
+    '                Dim entity As NativeEntity = DeletionList_NonNative(i)
+    '                If entity.Exists Then
+    '                    entity.Delete()
+    '                End If
+    '                DeletionList_NonNative.RemoveAt(i)
+    '            Next
+    '        End If
+    '    End Sub
+    'End Class
 End Class
+
+'IS_SNIPER_BULLET_IN_AREA( 64811, 338, 0, 64826, 350, 10 )
+'IS_PROJECTILE_IN_AREA

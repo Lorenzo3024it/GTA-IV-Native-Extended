@@ -44,11 +44,22 @@ Public Class NativeVehicles
     Public Shared Sub ControlDoor(ByVal Car As Vehicle, ByVal CarDoor As GTA.VehicleDoor, ByVal UnknownBool As Boolean, ByVal DoorAngle As Double)
         [Call]("CONTROL_CAR_DOOR", Car, CarDoor, UnknownBool, DoorAngle)
     End Sub
-
     Public Shared Sub DetachCar(Car As Vehicle)
         [Call]("DETACH_CAR", Car)
     End Sub
-    Public Shared Function getAllColors(Car As Vehicle) As (ColorIndex, ColorIndex, ColorIndex, ColorIndex)
+    Public Shared Sub Freeze(Car As Vehicle, Optional Freeze As Boolean = True, Optional DontLoadCollision As Boolean = False)
+        If Freeze Then
+            If DontLoadCollision Then
+                [Call]("FREEZE_CAR_POSITION_AND_DONT_LOAD_COLLISION", Car, True)
+            Else
+                [Call]("FREEZE_CAR_POSITION", Car, True)
+            End If
+        Else
+            [Call]("FREEZE_CAR_POSITION", Car, False)
+            [Call]("FREEZE_CAR_POSITION_AND_DONT_LOAD_COLLISION", Car, False)
+        End If
+    End Sub
+    Public Shared Function GetAllColors(Car As Vehicle) As (ColorIndex, ColorIndex, ColorIndex, ColorIndex)
         Dim Pointer1, Pointer2, Pointer3, Pointer4 As Native.Pointer
         Pointer1 = New Native.Pointer(GetType(ColorIndex))
         Pointer2 = New Native.Pointer(GetType(ColorIndex))
@@ -62,18 +73,23 @@ Public Class NativeVehicles
             Exit Function
         End If
     End Function
-    Public Shared Function getCurrentGear_TBoGT(Car As Vehicle) As Integer
+    Public Shared Function GetCarBlocking(Car As Vehicle) As Vehicle
+        Dim pointer As Native.Pointer = New Native.Pointer(GetType(Vehicle))
+        [Call](Of Vehicle)("GET_CAR_BLOCKING_CAR", Car, pointer)
+        Return pointer.Value
+    End Function
+    Public Shared Function GetCurrentGear_TBoGT(Car As Vehicle) As Integer
         Return [Call](Of Integer)("GET_VEHICLE_GEAR", Car)
     End Function
-    Public Shared Function getDeformation(Car As Vehicle, Position As Vector3) As Vector3
+    Public Shared Function GetDeformation(Car As Vehicle, Position As Vector3) As Vector3
         Dim Deformation As Native.Pointer = New Native.Pointer(GetType(Vector3))
         [Call]("GET_CAR_DEFORMATION_AT_POS", Car, Position.X, Position.Y, Position.Z, Deformation)
         Return Deformation.Value
     End Function
-    Public Shared Function getEngineRevs_TBoGT(Car As Vehicle) As Integer
+    Public Shared Function GetEngineRevs_TBoGT(Car As Vehicle) As Integer
         Return [Call](Of Integer)("GET_VEHICLE_ENGINE_REVS", Car)
     End Function
-    Public Shared Function getEngineState(Car As Vehicle) As EngineState
+    Public Shared Function GetEngineState(Car As Vehicle) As EngineState
         'Dim HealthPointer As Native.Pointer = New Native.Pointer(GetType(Integer))
         '[Call]("GET_PETROL_TANK_HEALTH", Car, HealthPointer)
         Dim Fuel As Integer = Car.PetrolTankHealth
@@ -94,7 +110,7 @@ Public Class NativeVehicles
     ''' Returns the height (in meters) of the specified entity above the ground level.
     ''' </summary>
     ''' <returns>Height above the ground in meters. Returns 0 if ground not found.</returns>
-    Public Shared Function getHeightAboveGround(Car As Vehicle) As Single
+    Public Shared Function GetHeightAboveGround(Car As Vehicle) As Single
         Try
             If Car Is Nothing OrElse Not Car.Exists Then Return 0.0F
 
@@ -114,7 +130,7 @@ Public Class NativeVehicles
             Return 0.0F
         End Try
     End Function
-    Public Shared Function getNumberOfPassengers(Car As Vehicle) As Integer
+    Public Shared Function GetNumberOfPassengers(Car As Vehicle) As Integer
         Dim Num As Native.Pointer = New Native.Pointer(GetType(Integer))
         [Call]("GET_NUMBER_OF_PASSENGERS", Car, Num)
         Return Num.Value
@@ -125,10 +141,10 @@ Public Class NativeVehicles
     '    [Call]("GET_CAR_SPEED_VECTOR", Car, SpeedVector, Unknown)
     '    Return SpeedVector.Value
     'End Function
-    Public Shared Function hasBeenDamagedByCar(Car As Vehicle) As Boolean
+    Public Shared Function HasBeenDamagedByCar(Car As Vehicle) As Boolean
         Return [Call](Of Boolean)("HAS_CAR_BEEN_DAMAGED_BY_CAR", Car, World.GetClosestVehicle(Car.Position, 6.0F))
     End Function
-    Public Shared Function hasBeenResprayed(Car As Vehicle) As Boolean
+    Public Shared Function HasBeenResprayed(Car As Vehicle) As Boolean
         Return [Call](Of Boolean)("HAS_CAR_BEEN_RESPRAYED")
     End Function
     Public Shared Function isDoorDamaged(Car As Vehicle, Door As GTA.VehicleDoor) As Boolean
@@ -285,14 +301,14 @@ Public Class NativeVehicles
     Public Shared Sub SetGPSEnabled(Car As Vehicle, Enable As Boolean)
         [Call]("ENABLE_GPS_IN_VEHICLE", Car, Enable)
     End Sub
-    Public Shared Sub SetGPSRoute(ByVal Blip As Blip, ByVal Enable As Boolean)
+    Public Shared Sub SetGPSRoute(Blip As Blip, Optional Enable As Boolean = True)
         Dim state As Integer
         If Enable = True Then state = 1 Else state = 0
         [Call]("SET_ROUTE", Blip, state)
     End Sub
-    Public Shared Sub SetExtra(Car As Vehicle, ExtraID As Integer, Enabled As Boolean)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, ExtraID, Not Enabled)
-    End Sub
+    'Public Shared Sub SetExtra(Car As Vehicle, ExtraID As Integer, Enabled As Boolean)
+    '    [Call]("TURN_OFF_VEHICLE_EXTRA", Car, ExtraID, Not Enabled)
+    'End Sub
     Public Shared Sub SetExtraWithDoorAngle(Car As Vehicle, ExtraID As Integer, Enabled As Boolean)
         'Dim DoorAngle0 As Double = Car.Door(VehicleDoor.LeftFront)
         'Dim DoorAngle1 As Double = Car.Door(VehicleDoor.RightFront)
@@ -349,17 +365,29 @@ Public Class NativeVehicles
     Public Shared Sub SetStrong(Car As Vehicle, Strong As Boolean)
         [Call]("SET_CAR_STRONG", Car, Strong)
     End Sub
-    Public Shared Sub SetVehicleExtras(Car As Vehicle, Extra0 As Boolean, Extra1 As Boolean, Extra2 As Boolean, Extra3 As Boolean, Extra4 As Boolean, Extra5 As Boolean, Extra6 As Boolean, Extra7 As Boolean, Extra8 As Boolean, Extra9 As Boolean)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 0, Not Extra0)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 1, Not Extra1)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 2, Not Extra2)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 3, Not Extra3)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 4, Not Extra4)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 5, Not Extra5)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 6, Not Extra6)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 7, Not Extra7)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 8, Not Extra8)
-        [Call]("TURN_OFF_VEHICLE_EXTRA", Car, 9, Not Extra9)
+    ''' <summary>
+    ''' Enables or disables vehicle extras. 
+    ''' You may specify only the extras you want to modify; all parameters are optional.
+    ''' </summary>
+    Public Shared Sub SetExtras(Car As Vehicle, Optional Extra0 As Boolean? = Nothing, Optional Extra1 As Boolean? = Nothing, Optional Extra2 As Boolean? = Nothing,
+                                       Optional Extra3 As Boolean? = Nothing, Optional Extra4 As Boolean? = Nothing, Optional Extra5 As Boolean? = Nothing,
+                                       Optional Extra6 As Boolean? = Nothing, Optional Extra7 As Boolean? = Nothing, Optional Extra8 As Boolean? = Nothing, Optional Extra9 As Boolean? = Nothing)
+        ApplyExtra(Car, 0, Extra0)
+        ApplyExtra(Car, 1, Extra1)
+        ApplyExtra(Car, 2, Extra2)
+        ApplyExtra(Car, 3, Extra3)
+        ApplyExtra(Car, 4, Extra4)
+        ApplyExtra(Car, 5, Extra5)
+        ApplyExtra(Car, 6, Extra6)
+        ApplyExtra(Car, 7, Extra7)
+        ApplyExtra(Car, 8, Extra8)
+        ApplyExtra(Car, 9, Extra9)
+    End Sub
+    'Local helper to avoid repeating code
+    Private Shared Sub ApplyExtra(car As Vehicle, index As Integer, value As Boolean?)
+        If value.HasValue Then
+            [Call]("TURN_OFF_VEHICLE_EXTRA", car, index, Not value.Value)
+        End If
     End Sub
     'Public Class VehicleExtended
     '    Private BaseVehicle As Vehicle
@@ -547,6 +575,57 @@ Public Class NativeVehicles
     '        [Call]("POP_CAR_BOOT", BaseVehicle)
     '    End Sub
     'End Class
+    Public Class StuckChecks
+        ''' <summary>
+        ''' Untested.
+        ''' </summary>
+        Public Shared Sub AddStuckCheck(Car As Vehicle, Optional Duration As Integer = 10000, Optional RestoreIfStuck As Boolean = True,
+                                        Optional RestoreIfUpsideDown As Boolean = True, Optional Unknown As Boolean = True, Optional PathID As Integer = -1, Optional Distance As Single = 1.5)
+            If HasStuckCheck(Car) Then Exit Sub
+
+            If RestoreIfStuck Or RestoreIfUpsideDown Or Unknown Then
+                [Call]("ADD_STUCK_CAR_CHECK_WITH_WARP", Car, Duration, Distance)
+            Else
+                [Call]("ADD_STUCK_CAR_CHECK", Car, Duration, Distance, RestoreIfStuck, RestoreIfUpsideDown, Unknown, PathID)
+            End If
+        End Sub
+        ''' <summary>
+        ''' Untested.
+        ''' </summary>
+        Public Shared Sub AddUpsideDownStuckCheck(Car As Vehicle)
+            [Call]("ADD_UPSIDEDOWN_CAR_CHECK", Car)
+        End Sub
+        ''' <summary>
+        ''' Untested.
+        ''' </summary>
+        ''' <param name="Flag">Values between 0 and 3</param>
+        ''' <param name="ElapsedTime">Duration in Ms or zero</param>
+        Public Shared Function CheckStuckTimer(Car As Vehicle, Flag As Integer, ElapsedTime As Integer) As Boolean
+            Return [Call](Of Boolean)("CHECK_STUCK_TIMER", Car, Flag, ElapsedTime)
+        End Function
+        ''' <summary>
+        ''' Untested.
+        ''' </summary>
+        Public Shared Function HasStuckCheck(Car As Vehicle) As Boolean
+            Return [Call](Of Boolean)("DOES_CAR_HAVE_STUCK_CAR_CHECK", Car)
+        End Function
+        Public Shared Function isStuckOnRoof(Car As Vehicle) As Boolean
+            Return [Call](Of Boolean)("IS_CAR_STUCK_ON_ROOF", Car)
+        End Function
+        ''' <summary>
+        ''' Untested.
+        ''' </summary>
+        ''' <param name="Flag">Values between 0 and 3</param>
+        Public Shared Sub ResetStuckTimer(Car As Vehicle, Flag As Integer)
+            [Call]("RESET_STUCK_TIMER", Car, Flag)
+        End Sub
+        ''' <summary>
+        ''' Untested.
+        ''' </summary>
+        Public Shared Sub RemoveStuckTimer(Car As Vehicle)
+            [Call]("REMOVE_STUCK_TIMER", Car)
+        End Sub
+    End Class
     Public Class CarRecording
         Public Shared Function GetPositionInRecording(Car As Vehicle) As Single
             Return [Call](Of Single)("FIND_POSITION_IN_RECORDING", Car)

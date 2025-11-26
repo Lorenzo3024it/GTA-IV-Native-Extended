@@ -20,6 +20,8 @@ Public Class NativeGarage
     Private _ownedByPlayer As Boolean = False
     Private _canOpenManually As Boolean = True
     Private _radius As Single
+    Private Shared _isTickEnabled As Boolean
+    Private Shared _tickHandler As Action = AddressOf UpdateGarageControl_OnTick
     Public Shared ToggleGarageDoor As Keys
     Public ReadOnly Property Blip As Blip
     Public ReadOnly Property Hash As String
@@ -62,6 +64,18 @@ Public Class NativeGarage
         Set(value As Vehicle)
             [Call]("SET_TARGET_CAR_FOR_MISSION_GARAGE", Hash, TargetVehicle)
             _targetcar = value
+        End Set
+    End Property
+    Public Shared Property Tick As Boolean
+        Get
+            Return _isTickEnabled
+        End Get
+        Set(value As Boolean)
+            If value = True Then
+                If Not TickHelper.ContainsHandler_Internal(_tickHandler) Then TickHelper.Add_Internal(_tickHandler)
+            Else
+                If TickHelper.ContainsHandler_Internal(_tickHandler) Then TickHelper.Remove_Internal(_tickHandler)
+            End If
         End Set
     End Property
     Public ReadOnly Property isOpen As Boolean
@@ -195,6 +209,7 @@ Public Class NativeGarage
     'End Sub
     Public Function isVehicleInside(Car As Vehicle)
         Return [Call](Of Boolean)("IS_CAR_IN_GARAGE_AREA", Hash, Car)
+        'NativePTFX.
     End Function
     Public Function isPlayerInside() As Boolean
         If NativePlayer.Character.Position.DistanceTo(Position) < _radius Then
@@ -345,7 +360,7 @@ Public Class NativeGarage
 
         Return False
     End Function
-    Public Shared Function getGarageOfVehicle(Car As Vehicle) As NativeGarage
+    Public Shared Function GetGarageOfVehicle(Car As Vehicle) As NativeGarage
         Try
             If Car Is Nothing OrElse Not Car.Exists Then Return Nothing
             If List Is Nothing OrElse List.Count = 0 Then Return Nothing
@@ -373,7 +388,7 @@ Public Class NativeGarage
             End If
         End If
     End Sub
-    Public Class Tick
+    Private Class Tick_OLD
         Private Shared _tickHandler As Action = AddressOf UpdateGarageControl_OnTick
         Public Sub New(handler As Action)
             _tickHandler = handler

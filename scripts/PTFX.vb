@@ -11,27 +11,47 @@ Public Class NativePTFX
             Return _ptfxHandle
         End Get
     End Property
-    Public ReadOnly Property FxName As String
+    ''' <summary>
+    ''' Sets or return the current ParticleFx string. Can be edited
+    ''' Uses UPDATE_PTFX_OFFSETS function without editing rotation.
+    ''' </summary>
+    Public Property Fx As String
         Get
             Return _fxHashName
         End Get
-    End Property
-    Public Property Position As Vector3
-        Get
-            Return _pos
-        End Get
-        Set(value As Vector3)
-            [Call]("UPDATE_PTFX_OFFSETS", _ptfxHandle, value.X, value.Y, value.Z, _rot.X, _rot.Y, _rot.Z)
-            _pos = value
+        Set(value As String)
+            _fxHashName = value
         End Set
     End Property
-    Public Property Rotation As Vector3
+    ''' <summary>
+    ''' Can be modified after starting to edit the PTFX position.
+    ''' Uses UPDATE_PTFX_OFFSETS function without editing rotation.
+    ''' </summary>
+    Public Property Position As Vector3
         Get
-            Return _rot
+            If _ptfxHandle = 0 Then Return Vector3.Zero Else Return _rot
         End Get
         Set(value As Vector3)
-            [Call]("UPDATE_PTFX_OFFSETS", _ptfxHandle, _pos.X, _pos.Y, _pos.Z, value.X, value.Y, value.Z)
-            _rot = value
+            If _ptfxHandle <> 0 Then
+                [Call]("UPDATE_PTFX_OFFSETS", _ptfxHandle, value.X, value.Y, value.Z, _rot.X, _rot.Y, _rot.Z)
+                _pos = value
+            End If
+        End Set
+    End Property
+    ''' <summary>
+    ''' Can be modified after starting to edit the PTFX position.
+    ''' Uses UPDATE_PTFX_OFFSETS function without editing position.
+    ''' </summary>
+    Public Property Rotation As Vector3
+        Get
+            If _ptfxHandle = 0 Then Return Vector3.Zero Else Return _rot
+        End Get
+        Set(value As Vector3)
+
+            If _ptfxHandle <> 0 Then
+                [Call]("UPDATE_PTFX_OFFSETS", _ptfxHandle, _pos.X, _pos.Y, _pos.Z, value.X, value.Y, value.Z)
+                _rot = value
+            End If
         End Set
     End Property
     Public Sub New(ParticleFx As String)
@@ -40,69 +60,127 @@ Public Class NativePTFX
         ' _ptfxHandle = StartPTFX(ParticleFx, New Vector3(0, 0, 0), New Vector3(0, 0, 0), 0.000000001)
         '  StopPTFX(_ptfxHandle)
     End Sub
-    Public Sub Evolve(Optional Effect As String = "fade", Optional Value As Single = 0)
+    ''' <summary>
+    ''' Applies some effects to a PTFX. In IV SCO script only the Fade effect is used.
+    ''' TLaD scripts never use the EVOLVE_PTFX function. The other one are from TBoGT.
+    ''' Not tested these on IV.
+    ''' </summary>
+    ''' <param name="Effect">A String from Effects structure.</param>
+    Public Sub Evolve(Optional Effect As String = Effects.Fade, Optional Value As Single = 1.0)
         [Call]("EVOLVE_PTFX", _ptfxHandle, Effect, Value)
     End Sub
     Public Function Exists() As Boolean
         If _ptfxHandle <> 0 Then Return True Else Return False
     End Function
-    Public Sub Start(Position As Vector3, Rotation As Vector3, FxScale As Single)
-        _ptfxHandle = [Call](Of Integer)("START_PTFX", _fxHashName.ToString, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+    ''' <param name="OverrideFx">A string from ParticleFx structure to temporarely override the Fx</param>
+    Public Sub Start(Position As Vector3, Rotation As Vector3, FxScale As Single, Optional OverrideFx As String = Nothing)
+        Dim fx As String
+        If OverrideFx = Nothing Or OverrideFx = "" Then
+            fx = _fxHashName.ToString
+        Else
+            fx = OverrideFx
+        End If
+
+        If Me.Exists Then Me.Stop()
+
+        _ptfxHandle = [Call](Of Integer)("START_PTFX", fx, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+        _pos = Position
+        _rot = Rotation
     End Sub
-    Public Sub StartOnVehicle(Car As Vehicle, Position As Vector3, Rotation As Vector3, FxScale As Single)
-        _ptfxHandle = [Call](Of Integer)("START_PTFX_ON_VEH", _fxHashName.ToString, Car, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+    ''' <param name="OverrideFx">A string from ParticleFx structure to temporarely override the Fx</param>
+    Public Sub StartOnVehicle(Car As Vehicle, Position As Vector3, Rotation As Vector3, FxScale As Single, Optional OverrideFx As String = Nothing)
+        Dim fx As String
+        If OverrideFx = Nothing Or OverrideFx = "" Then
+            fx = _fxHashName.ToString
+        Else
+            fx = OverrideFx
+        End If
+
+        If Me.Exists Then Me.Stop()
+
+        _ptfxHandle = [Call](Of Integer)("START_PTFX_ON_VEH", fx, Car, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+        _pos = Position
+        _rot = Rotation
     End Sub
-    Public Sub StartOnObject(Obj As GTA.Object, Position As Vector3, Rotation As Vector3, FxScale As Single)
-        _ptfxHandle = [Call](Of Integer)("START_PTFX_ON_OBJ", _fxHashName.ToString, Obj, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+    ''' <param name="OverrideFx">A string from ParticleFx structure to temporarely override the Fx</param>
+    Public Sub StartOnObject(Obj As GTA.Object, Position As Vector3, Rotation As Vector3, FxScale As Single, Optional OverrideFx As String = Nothing)
+        Dim fx As String
+        If OverrideFx = Nothing Or OverrideFx = "" Then
+            fx = _fxHashName.ToString
+        Else
+            fx = OverrideFx
+        End If
+
+        If Me.Exists Then Me.Stop()
+
+        _ptfxHandle = [Call](Of Integer)("START_PTFX_ON_OBJ", fx, Obj, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+        _pos = Position
+        _rot = Rotation
     End Sub
-    Public Sub StartOnPed(Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, FxScale As Single)
-        _ptfxHandle = [Call](Of Integer)("START_PTFX_ON_PED", _fxHashName.ToString, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+    ''' <param name="OverrideFx">A string from ParticleFx structure to temporarely override the Fx</param>
+    Public Sub StartOnPed(Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, FxScale As Single, Optional OverrideFx As String = Nothing)
+        Dim fx As String
+        If OverrideFx = Nothing Or OverrideFx = "" Then
+            fx = _fxHashName.ToString
+        Else
+            fx = OverrideFx
+        End If
+
+        If Me.Exists Then Me.Stop()
+
+        _ptfxHandle = [Call](Of Integer)("START_PTFX_ON_PED", fx, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+        _pos = Position
+        _rot = Rotation
     End Sub
-    Public Sub StartOnPedBone(Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, BoneID As Bone, FxScale As Single)
-        _ptfxHandle = [Call](Of Integer)("START_PTFX_ON_PED_BONE", _fxHashName.ToString, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, BoneID, FxScale)
+    ''' <param name="OverrideFx">A string from ParticleFx structure to temporarely override the Fx</param>
+    Public Sub StartOnPedBone(Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, BoneID As Bone, FxScale As Single, Optional OverrideFx As String = Nothing)
+        Dim fx As String
+        If OverrideFx = Nothing Or OverrideFx = "" Then
+            fx = _fxHashName.ToString
+        Else
+            fx = OverrideFx
+        End If
+
+        If Me.Exists Then Me.Stop()
+
+        _ptfxHandle = [Call](Of Integer)("START_PTFX_ON_PED_BONE", fx, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, BoneID, FxScale)
+        _pos = Position
+        _rot = Rotation
     End Sub
     Public Sub [Stop]()
-        [Call]("STOP_PTFX", _ptfxHandle)
+        If _ptfxHandle <> 0 Then
+            [Call]("STOP_PTFX", _ptfxHandle)
+        End If
         _ptfxHandle = 0
+        _pos = Vector3.Zero
+        _rot = Vector3.Zero
     End Sub
-    Public Shared Function StartPTFX(PTFX As String, Position As Vector3, Rotation As Vector3, FxScale As Single) As Integer
-        Return [Call](Of Integer)("START_PTFX", PTFX.ToString, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
-    End Function
-    Public Shared Function StartPTFXOnVehicle(PTFX As String, Car As Vehicle, Position As Vector3, Rotation As Vector3, FxScale As Single) As Integer
-        Return [Call](Of Integer)("START_PTFX_ON_VEH", PTFX.ToString, Car, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
-    End Function
-    Public Shared Function StartPTFXOnObject(PTFX As String, Obj As GTA.Object, Position As Vector3, Rotation As Vector3, FxScale As Single) As Integer
-        Return [Call](Of Integer)("START_PTFX_ON_OBJ", PTFX.ToString, Obj, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
-    End Function
-    Public Shared Function StartPTFXOnPed(PTFX As String, Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, FxScale As Single) As Integer
-        Return [Call](Of Integer)("START_PTFX_ON_PED", PTFX.ToString, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
-    End Function
-    Public Shared Function StartPTFXOnPedBone(PTFX As String, Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, BoneID As Bone, FxScale As Single) As Integer
-        Return [Call](Of Integer)("START_PTFX_ON_PED_BONE", PTFX.ToString, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, BoneID, FxScale)
-    End Function
-    Public Shared Sub EvolvePTFX(PTFX As Integer, Optional Effect As String = "fade", Optional Value As Single = 0)
-        [Call]("EVOLVE_PTFX", PTFX, Effect, Value)
+    '-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+    Public Shared WriteOnly Property PTFXCamInsideVehicle As Boolean
+        Set(value As Boolean)
+            [Call]("SET_PTFX_CAM_INSIDE_VEHICLE", value)
+        End Set
+    End Property
+    Public Shared Sub RemoveAllPTFX_FromVehicle(Car As Vehicle)
+        [Call]("REMOVE_PTFX_FROM_VEHICLE", Car)
     End Sub
-    Public Shared Sub StopPTFX(PTFX As Integer)
-        [Call]("STOP_PTFX", PTFX)
+    Public Shared Sub RemoveAllPTFX_FromPed(Ped As Ped)
+        [Call]("REMOVE_PTFX_FROM_PED", Ped)
     End Sub
-    Public Shared Sub TriggerPTFX(PTFX As String, Position As Vector3, Rotation As Vector3, FxScale As Single)
+    Public Shared Sub Trigger(PTFX As String, Position As Vector3, Rotation As Vector3, FxScale As Single)
         [Call]("TRIGGER_PTFX", PTFX.ToString, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
     End Sub
-    Public Shared Sub TriggerPTFXOnVehicle(PTFX As String, Car As Vehicle, Position As Vector3, Rotation As Vector3, FxScale As Single)
+    Public Shared Sub TriggerOnVehicle(PTFX As String, Car As Vehicle, Position As Vector3, Rotation As Vector3, FxScale As Single)
         [Call](Of Integer)("TRIGGER_PTFX_ON_VEH", PTFX.ToString, Car, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
     End Sub
-    Public Shared Sub TriggerPTFXOnObject(PTFX As String, Obj As GTA.Object, Position As Vector3, Rotation As Vector3, FxScale As Single)
+    Public Shared Sub TriggerOnObject(PTFX As String, Obj As GTA.Object, Position As Vector3, Rotation As Vector3, FxScale As Single)
         [Call](Of Integer)("TRIGGER_PTFX_ON_OBJ", PTFX.ToString, Obj, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
     End Sub
-    Public Shared Sub TriggerPTFXOnPed(PTFX As String, Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, FxScale As Single)
+    Public Shared Sub TriggerOnPed(PTFX As String, Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, FxScale As Single)
         [Call](Of Integer)("TRIGGER_PTFX_ON_PED", PTFX.ToString, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
     End Sub
-    Public Shared Sub TriggertPTFXOnPedBone(PTFX As String, Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, BoneID As Bone, FxScale As Single)
+    Public Shared Sub TriggerOnPedBone(PTFX As String, Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, BoneID As Bone, FxScale As Single)
         [Call](Of Integer)("TRIGGER_PTFX_ON_PED_BONE", PTFX.ToString, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, BoneID, FxScale)
-    End Sub
-    Public Shared Sub UpdatePTFXOffsets(PTFX As Integer, Position As Vector3, Rotation As Vector3)
-        [Call]("UPDATE_PTFX_OFFSETS", PTFX, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z)
     End Sub
     '-----------------------------------------------------------------------------------------------------------------------------------------------------------------
     Public Structure ParticleFXs
@@ -790,25 +868,62 @@ Public Class NativePTFX
         Public Const WindDebrisMail As String = "wind_debris_mail"
         Public Const WindDebrisPaper As String = "wind_debris_paper"
     End Structure
-    'Public Class Helper
-    '    Public Structure Keys
-    '        Public Shared MoveForward As Keys
-    '        Public Shared MoveBackward As Keys
-    '        Public Shared MoveUp As Keys
-    '        Public Shared MoveDown As Keys
-    '        Public Shared MoveLeft As Keys
-    '        Public Shared MoveRight As Keys
-    '        Public Shared NextEffect As Keys
-    '        Public Shared PreviousEffect As Keys
-    '        Public Shared IncreaseSize As Keys
-    '        Public Shared DecreaseSize As Keys
-    '        Public Shared RotateYawLeft As Keys
-    '        Public Shared RotateYawRight As Keys
-    '        Public Shared RotatePitchUp As Keys
-    '        Public Shared RotatePitchDown As Keys
-    '        Public Shared RotateRollLeft As Keys
-    '        Public Shared RotateRollRight As Keys
-    '    End Structure
-
-    'End Class
+    Public Structure Effects
+        Public Const Fade As String = "fade"
+        Public Const Boost_TBoGT As String = "level"
+        Public Const Brake_TBoGT As String = "brake"
+        Public Const Damage_TBoGT As String = "damage"
+        Public Const Fire_TBoGT As String = "fire"
+        Public Const Level_TBoGT As String = "level"
+        Public Const Panel_TBoGT As String = "panel"
+        Public Const Nitro_TBoGT As String = "nitro"
+        Public Const Speed_TBoGT As String = "speed"
+    End Structure
 End Class
+
+
+'Public Class Helper
+'    Public Structure Keys
+'        Public Shared MoveForward As Keys
+'        Public Shared MoveBackward As Keys
+'        Public Shared MoveUp As Keys
+'        Public Shared MoveDown As Keys
+'        Public Shared MoveLeft As Keys
+'        Public Shared MoveRight As Keys
+'        Public Shared NextEffect As Keys
+'        Public Shared PreviousEffect As Keys
+'        Public Shared IncreaseSize As Keys
+'        Public Shared DecreaseSize As Keys
+'        Public Shared RotateYawLeft As Keys
+'        Public Shared RotateYawRight As Keys
+'        Public Shared RotatePitchUp As Keys
+'        Public Shared RotatePitchDown As Keys
+'        Public Shared RotateRollLeft As Keys
+'        Public Shared RotateRollRight As Keys
+'    End Structure
+
+'End Class
+'Public Shared Sub StopPTFX(PTFX As Integer)
+'    [Call]("STOP_PTFX", PTFX)
+'End Sub
+'Public Shared Function StartPTFX(PTFX As String, Position As Vector3, Rotation As Vector3, FxScale As Single) As Integer
+'    Return [Call](Of Integer)("START_PTFX", PTFX.ToString, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+'End Function
+'Public Shared Function StartPTFXOnVehicle(PTFX As String, Car As Vehicle, Position As Vector3, Rotation As Vector3, FxScale As Single) As Integer
+'    Return [Call](Of Integer)("START_PTFX_ON_VEH", PTFX.ToString, Car, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+'End Function
+'Public Shared Function StartPTFXOnObject(PTFX As String, Obj As GTA.Object, Position As Vector3, Rotation As Vector3, FxScale As Single) As Integer
+'    Return [Call](Of Integer)("START_PTFX_ON_OBJ", PTFX.ToString, Obj, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+'End Function
+'Public Shared Function StartPTFXOnPed(PTFX As String, Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, FxScale As Single) As Integer
+'    Return [Call](Of Integer)("START_PTFX_ON_PED", PTFX.ToString, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, FxScale)
+'End Function
+'Public Shared Function StartPTFXOnPedBone(PTFX As String, Ped As GTA.Ped, Position As Vector3, Rotation As Vector3, BoneID As Bone, FxScale As Single) As Integer
+'    Return [Call](Of Integer)("START_PTFX_ON_PED_BONE", PTFX.ToString, Ped, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, BoneID, FxScale)
+'End Function
+'Public Shared Sub EvolvePTFX(PTFX As Integer, Optional Effect As String = "fade", Optional Value As Single = 0)
+'    [Call]("EVOLVE_PTFX", PTFX, Effect, Value)
+'End Sub
+'Public Shared Sub UpdatePTFXOffsets(PTFX As Integer, Position As Vector3, Rotation As Vector3)
+'    [Call]("UPDATE_PTFX_OFFSETS", PTFX, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z)
+'End Sub

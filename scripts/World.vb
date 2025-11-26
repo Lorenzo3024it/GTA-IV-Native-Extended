@@ -6,6 +6,26 @@ Imports GTA.Native.Function
 'Imports NativeExtended.NativeGarage
 Public Class NativeWorld
     ''' <summary>
+    ''' Untested. Can be reset using ClearCoverBLockingAreas
+    ''' </summary>
+    Public Shared Sub AddCoverBlockingArea(MinCoords As Vector3, MaxCoords As Vector3, Unknown1 As Boolean, Unknown2 As Boolean, Unknown3 As Boolean)
+        [Call]("ADD_COVER_BLOCKING_AREA", MinCoords.X, MinCoords.Y, MinCoords.Z, MaxCoords.X, MaxCoords.Y, MaxCoords.Z, Unknown1, Unknown2, Unknown3)
+    End Sub
+    ''' <summary>
+    ''' untested
+    ''' </summary>
+    ''' <param name="Position"></param>
+    ''' <param name="Heading"></param>
+    ''' <param name="Unknown1">Values between 0 and 3</param>
+    ''' <param name="Unknown2">Values between 0 and 3</param>
+    ''' <param name="Unknown3">Usually 0, sometimes 1</param>
+    ''' <returns></returns>
+    Public Shared Function AddCoverPoint(Position As Vector3, Heading As Single, Unknown1 As Integer, Unknown2 As Integer, Optional Unknown3 As Integer = 0) As Integer
+        Dim Pointer As Native.Pointer = New Native.Pointer(GetType(Integer))
+        [Call](Of Integer)("ADD_COVER_POINT", Position.X, Position.Y, Position.Z, Unknown1, Heading, Unknown2, Unknown3, Pointer)
+        Return Pointer.Value
+    End Function
+    ''' <summary>
     ''' Untested
     ''' </summary>
     Public Shared Sub AddHospitalRestart(Coordinate As GTA.Vector3, FacingAngle As Double, HospitalID As Integer)
@@ -14,41 +34,15 @@ Public Class NativeWorld
     ''' <summary>
     ''' Untested
     ''' </summary>
-    Public Shared Sub AddPoliceRestart(Coordinate As GTA.Vector3, FacingAngle As Double, PoliceStationID As Integer)
-        [Call]("ADD_POLICE_RESTART", Coordinate.X, Coordinate.Y, Coordinate.Z, FacingAngle, PoliceStationID)
-    End Sub
-    ''' <summary>
-    ''' Untested
-    ''' </summary>
-    ''' <param name="Coordinate"></param>
-    ''' <param name="Range"></param>
-    ''' Not sure about this, but it should be the radius of area
+    ''' <param name="Range">Not sure about this.</param>
     Public Shared Sub AddSpawnBlockingArea(Coordinate As GTA.Vector3, Range As Single)
         [Call]("ADD_SPAWN_BLOCKING_AREA", Coordinate.X, Coordinate.Y, Coordinate.Z, Range)
     End Sub
     ''' <summary>
     ''' Untested
     ''' </summary>
-    ''' <param name="MinStartPosition"></param>
-    ''' <param name="MaxStartPosition"></param>
-    ''' <param name="MinEndPosition"></param>
-    ''' <param name="MaxEndPosition"></param>
-    ''' <param name="CameraPosition"></param>
-    ''' <param name="CashReward"></param>
     Public Shared Sub AddStuntJump(MinStartPosition As Vector3, MaxStartPosition As Vector3, MinEndPosition As Vector3, MaxEndPosition As Vector3, CameraPosition As Vector3, CashReward As Integer)
         [Call]("ADD_STUNT_JUMP", MinStartPosition.X, MinStartPosition.Y, MinStartPosition.Z, MaxStartPosition.X, MaxStartPosition.Y, MaxStartPosition.Z, MinEndPosition.X, MinEndPosition.Y, MinEndPosition.Z, MaxEndPosition.X, MaxEndPosition.Y, MaxEndPosition.Z, CameraPosition.X, CameraPosition.Y, CameraPosition.Z, CashReward)
-    End Sub
-    ''' <summary>
-    ''' Untested
-    ''' </summary>
-    Public Shared Sub AllowEmergencyServices(Optional Allow As Boolean = True)
-        [Call]("ALLOW_EMERGENCY_SERVICES", Allow)
-    End Sub
-    ''' <summary>
-    ''' Untested
-    ''' </summary>
-    Public Shared Sub AllowStuntJumps(Optional AllowToTrigger As Boolean = True)
-        [Call]("ALLOW_STUNT_JUMPS_TO_TRIGGER", AllowToTrigger)
     End Sub
     Public Shared Sub ClearArea(Coordinate As GTA.Vector3, Radius As Single, UnknownFlag As Boolean, Optional ClearPeds As Boolean = True, Optional ClearCars As Boolean = True, Optional ClearCops As Boolean = True, Optional ClearObjects As Boolean = True)
         If ClearPeds = True AndAlso ClearCars = True AndAlso ClearCops = True Then
@@ -59,6 +53,12 @@ Public Class NativeWorld
             If ClearCops Then [Call]("CLEAR_AREA_OF_COPS", Coordinate.X, Coordinate.Y, Coordinate.Z, Radius)
             If ClearObjects Then [Call]("CLEAR_AREA_OF_OBJECTS", Coordinate.X, Coordinate.Y, Coordinate.Z, Radius)
         End If
+    End Sub
+    Public Shared Sub ClearCoverBlockingAreas()
+        [Call]("FLUSH_COVER_BLOCKING_AREAS")
+    End Sub
+    Public Shared Sub ClearSpawnBlockingAreas()
+        [Call]("FLUSH_ALL_SPAWN_BLOCKING_AREAS")
     End Sub
     Public Shared Sub ClearTimecycleModifier()
         [Call]("CLEAR_TIMECYCLE_MODIFIER")
@@ -94,29 +94,73 @@ Public Class NativeWorld
         If ParkedCarDensity >= 0 Then [Call]("SET_PARKED_CAR_DENSITY_MULTIPLIER", ParkedCarDensity)
         SwitchRoads(Not SwitchRoadsOFF, New Vector3(0, 0, 0), New Vector3(5000, 5000, 200))
     End Sub
-    Public Shared Sub CreateExplosion(Position As GTA.Vector3, ExplosionType As Integer, Radius As Single, Audio As Boolean, Visible As Boolean, CameraShake As Single)
-        [Call]("ADD_EXPLOSION", Position.X, Position.Y, Position.Z, ExplosionType, Radius, Audio, Not Visible, CameraShake)
-    End Sub
-    Public Shared Sub EnableFancyWater(Optional Enable As Boolean = True)
-        [Call]("ENABLE_FANCY_WATER", Enable)
-    End Sub
-    Public Shared Sub EnableRomansTaxiGarageRadio(Optional Enable As Boolean = True)
-        [Call]("SET_TAXI_GARAGE_RADIO_STATE", Enable)
-    End Sub
-    Public Shared Sub EnableSaveHouse(SavehouseID As Integer, Optional Enable As Boolean = True)
-        [Call]("ENABLE_SAVE_HOUSE", SavehouseID, Enable)
-    End Sub
-    Public Shared Sub ForceParkedCarTooCloseToOthers(Enable As Boolean)
-        [Call]("FORCE_GENERATE_PARKED_CARS_TOO_CLOSE_TO_OTHERS", Enable)
-    End Sub
+    Public Shared ReadOnly Property CurrentWeather As Weather
+        Get
+            Dim point As Native.Pointer = New Native.Pointer(GetType(Weather))
+            [Call](Of Weather)("GET_CURRENT_WEATHER", point)
+            Return point.Value
+        End Get
+    End Property
+    'Public Shared Sub EnableFancyWater(Optional Enable As Boolean = True)
+    '    [Call]("ENABLE_FANCY_WATER", Enable)
+    'End Sub
     ''' <summary>
     ''' Untested
     ''' </summary>
-    ''' <param name="Unknown"></param>
-    ''' Values from -1.0 to 1.0
-    Public Shared Sub ForceWind(Unknown As Single)
-        [Call]("FORCE_WIND", Unknown)
+    Public Shared WriteOnly Property FancyWater As Boolean
+        Set(value As Boolean)
+            [Call]("ENABLE_FANCY_WATER", value)
+        End Set
+    End Property
+
+    'Public Shared Sub EnableRomansTaxiGarageRadio(Optional Enable As Boolean = True)
+    '    [Call]("SET_TAXI_GARAGE_RADIO_STATE", Enable)
+    'End Sub
+    'Public Shared Sub AllowEmergencyServices(Optional Allow As Boolean = True)
+    '    [Call]("ALLOW_EMERGENCY_SERVICES", Allow)
+    'End Sub
+    ''' <summary>
+    ''' Untested
+    ''' </summary>
+    Public Shared WriteOnly Property EmergencyServices As Boolean
+        Set(value As Boolean)
+            [Call]("ALLOW_EMERGENCY_SERVICES", value)
+        End Set
+    End Property
+    ''' <summary>
+    ''' Untested
+    ''' </summary>
+    Public Shared Sub EnableSaveHouse(SavehouseID As Integer, Optional Enable As Boolean = True)
+        [Call]("ENABLE_SAVE_HOUSE", SavehouseID, Enable)
     End Sub
+    'Public Shared Sub ForceParkedCarTooCloseToOthers(Enable As Boolean)
+    '    [Call]("FORCE_GENERATE_PARKED_CARS_TOO_CLOSE_TO_OTHERS", Enable)
+    'End Sub
+    ''' <summary>
+    ''' Untested
+    ''' </summary>
+    Public Shared WriteOnly Property ForceParkedCarTooCloseToOthers As Boolean
+        Set(value As Boolean)
+            [Call]("FORCE_GENERATE_PARKED_CARS_TOO_CLOSE_TO_OTHERS", value)
+        End Set
+    End Property
+    'Public Shared Sub ForceWind(Unknown As Single)
+    '    [Call]("FORCE_WIND", Unknown)
+    'End Sub
+    ''' <summary>
+    ''' Untested
+    ''' </summary>
+    ''' Values from -1.0 to 1.0
+    Public Shared WriteOnly Property ForceWind As Single
+        Set(value As Single)
+            [Call]("FORCE_WIND", value)
+        End Set
+    End Property
+    Public Shared WriteOnly Property FreeHealthCare As Boolean
+        Set(value As Boolean)
+            [Call]("SET_FREE_HEALTH_CARE", NativePlayer.Index, value)
+        End Set
+    End Property
     Public Shared Function GetClosestCarNode_WithHeading(Coordinates As GTA.Vector3) As (Vector3, Single)
         Dim pointPos1, pointPos2, pointPos3, pointHeading As Native.Pointer
         pointPos1 = New Native.Pointer(GetType(Single))
@@ -126,11 +170,11 @@ Public Class NativeWorld
         [Call]("GET_CLOSEST_CAR_NODE_WITH_HEADING", Coordinates.X, Coordinates.Y, Coordinates.Z, pointPos1, pointPos2, pointPos3, pointHeading)
         Return (New Vector3(pointPos1.Value, pointPos2.Value, pointPos3.Value), pointHeading.Value)
     End Function
-    Public Shared Function GetCurrentWeather() As Weather
-        Dim point As Native.Pointer = New Native.Pointer(GetType(Weather))
-        [Call](Of Weather)("GET_CURRENT_WEATHER", point)
-        Return point.Value
-    End Function
+    'Public Shared Function GetCurrentWeather() As Weather
+    '    Dim point As Native.Pointer = New Native.Pointer(GetType(Weather))
+    '    [Call](Of Weather)("GET_CURRENT_WEATHER", point)
+    '    Return point.Value
+    'End Function
     Public Shared Function GetDistance(Position1 As Vector3, Position2 As Vector3) As Single
         Dim Pointer As Native.Pointer = New Native.Pointer(GetType(Single))
         Return [Call](Of Single)("GET_DISTANCE_BETWEEN_COORDS_3D", Position1.X, Position1.Y, Position1.Z, Position2.X, Position2.Y, Position2.Z, Pointer)
@@ -175,15 +219,23 @@ Public Class NativeWorld
         [Call]("REQUEST_IPL", IPL)
         [Call]("LOAD_ALL_OBJECTS_NOW")
     End Sub
+    Public Shared Sub RemoveCoverPoint(CoverPointID As Integer)
+        [Call]("REMOVE_COVER_POINT", CoverPointID)
+    End Sub
     Public Shared Sub RemoveIPL(IPL As String, Discreetly As Boolean) 'testare
         If Discreetly Then [Call]("REMOVE_IPL_DISCREETLY", IPL) Else [Call]("REMOVE_IPL", IPL)
     End Sub
+    Public Shared WriteOnly Property RomansGarageRadio As Boolean
+        Set(value As Boolean)
+            [Call]("SET_TAXI_GARAGE_RADIO_STATE", value)
+        End Set
+    End Property
     'Public Shared Sub RequestInteriorModels() 'testare
     ' [Call]("REQUEST_INTERIOR_MODELS", hash as integer, string as object name?)
     ' End Sub
-    Public Shared Sub SetFreeHealthCare(Free As Boolean)
-        [Call]("SET_FREE_HEALTH_CARE", nativeplayer.index, Free)
-    End Sub
+    'Public Shared Sub SetFreeHealthCare(Free As Boolean)
+    '    [Call]("SET_FREE_HEALTH_CARE", NativePlayer.Index, Free)
+    'End Sub
     Public Shared Sub SetTimeOfDay(Hour As Integer, Minute As Integer, Optional ForceTimeDay As Boolean = False)
         If ForceTimeDay = False Then [Call]("SET_TIME_OF_DAY", Hour, Minute) Else [Call]("FORCE_TIME_OF_DAY", Hour, Minute)
     End Sub
@@ -196,15 +248,26 @@ Public Class NativeWorld
     Public Shared Sub SetTimecycleModifier(Modifier As String)
         [Call]("SET_TIMECYCLE_MODIFIER", Modifier)
     End Sub
+    'Public Shared Sub AllowStuntJumps(Optional AllowToTrigger As Boolean = True)
+    '    [Call]("ALLOW_STUNT_JUMPS_TO_TRIGGER", AllowToTrigger)
+    'End Sub
+    ''' <summary>
+    ''' Untested
+    ''' </summary>
+    Public Shared WriteOnly Property StuntJumps As Boolean
+        Set(value As Boolean)
+            [Call]("ALLOW_STUNT_JUMPS_TO_TRIGGER", value)
+        End Set
+    End Property
     Public Shared Sub SwapNearestBuildingModel(Position As Vector3, Unknown1 As Single, Model_old As String, Model_new As String)
-        [Call]("SWAP_NEAREST_BUILDING_MODEL", Position.X, Position.Y, Position.Z, Unknown1, NativeModels.getHashKey(Model_old), NativeModels.getHashKey(Model_new))
+        [Call]("SWAP_NEAREST_BUILDING_MODEL", Position.X, Position.Y, Position.Z, Unknown1, NativeModels.GetHashKey(Model_old), NativeModels.GetHashKey(Model_new))
     End Sub
     ''' <summary>
     ''' Disables boats, but not parked cars. Easy way to disable roads without affect traffic density.
     ''' </summary>
     ''' <param name="RoadsON">False to disable roads, true to switch roads back to normal.</param>
     ''' <param name="MinCoordinates">If set to "nothing" (default value), it will be set to Vector3.Zero</param>
-    ''' <param name="MaxCoordinates">If set to "nothing" (default value), it will be set to New Vector3(5000, 5000, 200), which should cover the entire map.</param>
+    ''' <param name="MaxCoordinates">If set to "nothing" (default value), it will be set to New Vector3(4000, 4000, 200), which will cover the entire map (and custom maps around Liberty City)</param>
     Public Shared Sub SwitchRoads(RoadsON As Boolean, Optional MinCoordinates As GTA.Vector3 = Nothing, Optional MaxCoordinates As GTA.Vector3 = Nothing)
         Dim MaxCoords, MinCoords As Vector3
         If MinCoordinates = Nothing Then
@@ -224,11 +287,10 @@ Public Class NativeWorld
         End If
     End Sub
     Public Shared Sub WeatherControl(RandomWeather As Boolean, InstantChange As Boolean, Optional Weather As GTA.Weather = 0, Optional KeepForced As Boolean = False)
-        Dim WeatherSet As Weather
+        Dim WeatherRandom As Weather
         If RandomWeather Then
-            Dim RandomNum As New Random
-            WeatherSet = RandomNum.Next(9)
-            If InstantChange Then [Call]("FORCE_WEATHER_NOW", WeatherSet) Else [Call]("FORCE_WEATHER", WeatherSet)
+            WeatherRandom = NativeGeneric.GetRandomInteger(0, 9)
+            If InstantChange Then [Call]("FORCE_WEATHER_NOW", WeatherRandom) Else [Call]("FORCE_WEATHER", WeatherRandom)
             If KeepForced = False Then [Call]("RELEASE_WEATHER")
         Else
             If InstantChange Then [Call]("FORCE_WEATHER_NOW", Weather) Else [Call]("FORCE_WEATHER", Weather)

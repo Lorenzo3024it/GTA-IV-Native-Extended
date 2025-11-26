@@ -16,7 +16,6 @@ Public Class NativePaynSpray
             Return [Call](Of Boolean)("IS_PAY_N_SPRAY_ACTIVE")
         End Get
     End Property
-
     Public Shared Function AllowCarToBeResprayed(Car As Vehicle, Optional Allow As Boolean = True) As Boolean
         Return [Call](Of Boolean)("SET_CAN_RESPRAY_CAR", Car, Allow)
     End Function

@@ -184,6 +184,8 @@ Public Class NativeAudio
         Sound33 = 69
         Sound34 = 71
     End Enum
+    'REQUEST_AMBIENT_AUDIO_BANK( "SCRIPT_AMBIENT\TELEVISION" )
+    'AMBIENT_AUDIO_BANK_NO_LONGER_NEEDED
     '================================================================================================================
     Partial Public Class GameSounds
         Public Shared ReadOnly Vehicles_extras_car_door_lock As New NativeAudio("VEHICLES_EXTRAS_CAR_DOOR_LOCK")
@@ -238,63 +240,35 @@ Public Class NativeAudio
         Public Shared ReadOnly Bowling_alley_machine_sweep_pins_return As New NativeAudio("BOWLING_ALLEY_MACHINE_SWEEP_PINS_RETURN")
         Public Shared ReadOnly Street_food_grill As New NativeAudio("STREET_FOOD_GRILL")
     End Class
+    Public Class FireSound
+        Private _playing As Boolean
+        Private _ID As Integer
+        Sub New(Position As Vector3)
+            _ID = Nothing
+
+            Me.Position = Position
+            _playing = False
+        End Sub
+        Public ReadOnly Property Position As Vector3
+        Public ReadOnly Property SoundID As Integer
+            Get
+                Return _ID
+            End Get
+        End Property
+        Public ReadOnly Property isPlaying As Boolean
+            Get
+                Return _playing
+            End Get
+        End Property
+        Public Sub Play()
+            If _ID = Nothing Then _ID = [Call](Of Integer)("GET_SOUND_ID")
+            [Call]("PLAY_FIRE_SOUND_FROM_POSITION", _ID, Position.X, Position.Y, Position.Z)
+            _playing = True
+        End Sub
+        Public Sub [Stop](Optional RelaseSoundID As Boolean = True)
+            [Call]("STOP_SOUND", _ID)
+            _playing = False
+            If RelaseSoundID Then [Call]("RELEASE_SOUND_ID", _ID)
+        End Sub
+    End Class
 End Class
-
-'Sound strings
-'"VEHICLES_EXTRAS_CAR_DOOR_LOCK"
-'"MOBILE_PHONE_SMS_RECIEVE"
-'"GENERAL_WEAPONS_ROCKET_LOOP"
-'"GENERAL_MELEE_WOODEN_BAT_PED"
-'"VEHICLES_EXTRAS_LUX_SUV_TRUNK_CLOSE"
-'"ANIM_F2_PISTOL_WHIP"
-'"WEAPON_PICKUP_CAR_BOMB"
-'"GM3C_PHOTOGRAPH_MOBSTERS_DAUGHTER_SLAP"
-'"GM3_KIDNAP_MOBSTERS_DAUGHTER_PHONE_BOUNCE"
-'"G5_SEWAGE_SHOOTOUT_AIM_GUN"
-'"G5_SEWAGE_SHOOTOUT_CASE_LAND"
-'"GM4_KNOCK_ON_INSIDE_OF_BOOT"
-'"BODY_ARMOUR_BUY"
-'"HOSSAN_1_HEADBUTT"
-'"MOBILE_PRERING"
-
-'"WEAPON_PICKUP_HANDGUN"
-'"WEAPON_PICKUP_SHOTGUN"
-'"WEAPON_PICKUP_BARETTA"
-'"WEAPON_PICKUP_MP5K"
-'"WEAPON_PICKUP_UZI"
-'"WEAPON_PICKUP_SNIPER_RIFLE"
-'"WEAPON_PICKUP_KNIFE"
-'"WEAPON_PICKUP_GRENADE"
-'"WEAPON_PICKUP_M4"
-'"WEAPON_PICKUP_AK47"
-'"WEAPON_PICKUP_MOLOTOV"
-'"BODY_ARMOUR_BUY"
-'"JACOB_GUN_CAR_SELECT_WEAPON"
-'"JACOB_GUN_CAR_SELECT_WEAPON"
-'"JEFF_3_SKID"
-'"JEFF_3_HIT_BY_CAR"
-'"JEFF_3_HIT_GROUND"
-'"SAFEHOUSE_LIFT_TONE"
-'"TELEVISION_TURN_ON"
-'"TELEVISION_TURN_OFF"
-'"FRONTEND_OTHER_INFO"
-'"B2P_HIGH_END_ASSASSIN_PHONE_RING"
-'"B2P_HIGH_END_ASSASSIN_DIAL"
-' "B2P_HIGH_END_ASSASSIN_PHONE_HANG_UP"
-'"B4_TRESPASS_FLAMING_CHOPPER"
-' "B4_TRESPASS_LARGE_EXPLOSION"
-' "B4_TRESPASS_SMALL_EXPLOSION"
-'"B5_TRUCK_HUSTLE_CAB_BULLET_IMPACTS"
-'"B6_TO_LIVE_AND_DIE_IN_NJ_OPEN_GARAGE"
-'"B6_TO_LIVE_AND_DIE_IN_NJ_COLLECT_H"
-'"BC3_BUOYS_AHOY_HARBOUR_PATROL_SIREN"
-'"WARDROBE_BUY"
-'"BOWLING_ALLEY_BALL_RETURN"
-'"BOWLING_ALLEY_MACHINE_DESCEND"
-'"BOWLING_ALLEY_MACHINE_RAISE_PINS"
-'"BOWLING_ALLEY_MACHINE_SWEEP_PINS"
-'"BOWLING_ALLEY_MACHINE_SWEEP_PINS_RETURN"
-'"BOWLING_ALLEY_MACHINE_DESCEND"
-'"STREET_FOOD_GRILL"
-'------------
-' HANDLE_AUDIO_ANIM_EVENT( l_U220, "PAIN_HIGH" );

@@ -44,13 +44,13 @@ Public Class NativeModels
         End Get
     End Property
     ''' <summary>
-    ''' Untested. Used in Vlad's second mission (vlad2 in SCOCL).
+    ''' Untested. Used in Vlad's second mission (vlad2 in SCO).
     ''' </summary>
     Public Shared Sub DontSuppressAnyPedModel()
         [Call]("DONT_SUPPRESS_ANY_PED_MODELS")
     End Sub
     ''' <summary>
-    ''' Untested. Not found in SCOCL.
+    ''' Untested. Not found in SCO.
     ''' </summary>
     Public Shared Sub DontSuppressAnyCarModel()
         [Call]("DONT_SUPPRESS_ANY_CAR_MODELS")

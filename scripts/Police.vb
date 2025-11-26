@@ -25,7 +25,6 @@ Public Class NativePolice
             [Call]("DONT_DISPATCH_COPS_FOR_PLAYER", NativePlayer.Index, value)
         End Set
     End Property
-
     Public Shared Function isPlayerWantedLevelGreaterThan(WantedLevel) As Boolean
         Return [Call](Of Boolean)("IS_WANTED_LEVEL_GREATER", NativePlayer.Index, WantedLevel)
     End Function

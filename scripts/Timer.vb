@@ -2,70 +2,63 @@
 Imports GTA.Native.Function
 Public Class NativeTimer
     '========================================================================================================================
-    ' Native Timers A, B & C
-    '-------------------------
+    ' Native Timers [A], [B], [C] and GameTimer (TotalGameTime)
+    '------------------------------------------------------------
+    ''' <summary>
+    ''' The first native Timer, used by many vanilla scripts.
+    ''' You can set the "elapsed time" on the Timer A, BUT NOT RECOMMENDED!
+    ''' It could interfere with some vanilla scripts! Please use
+    ''' TimerC or a new instance of Native Timer instead.
+    ''' </summary>
+    ''' <returns>Time elapsed (ms) since last reset</returns>
+    Public Shared Property TimerA As Integer
+        Get
+            Return [Call](Of Integer)("TIMERA")
+        End Get
+        Set(value As Integer)
+            [Call]("SETTIMERA", value)
+        End Set
+    End Property
+    ''' <summary>
+    ''' The second native Timer, used by many vanilla scripts.
+    ''' You can set the "elapsed time" on the Timer B, BUT NOT RECOMMENDED!
+    ''' It could interfere with some vanilla scripts! Please use
+    ''' TimerC or a new instance of Native Timer instead.
+    ''' </summary>
+    ''' <returns>Time elapsed (ms) since last reset</returns>
+    Public Shared Property TimerB As Integer
+        Get
+            Return [Call](Of Integer)("TIMERB")
+        End Get
+        Set(value As Integer)
+            [Call]("SETTIMERB", value)
+        End Set
+    End Property
+    ''' <summary>
+    ''' The third native Timer, used only in vanilla Multiplayer scripts.
+    ''' It should be safe to set and reset "elapsed time", but my suggestion is to
+    ''' create a new istance of NativeTimer, which uses the TotalGameTime to 
+    ''' precisely Tick a sub, but without really resetting it.
+    ''' </summary>
+    ''' <returns>Time elapsed (ms) since last reset</returns>
+    Public Shared Property TimerC As Integer
+        Get
+            Return [Call](Of Integer)("TIMERC")
+        End Get
+        Set(value As Integer)
+            [Call]("SETTIMERC", value)
+        End Set
+    End Property
     ''' <summary>
     ''' Returns played time in milliseconds.
     ''' </summary>
-    Public Shared ReadOnly Property GameTimer As Integer
+    Public Shared ReadOnly Property TotalGameTime As Integer
         Get
             Dim point As Native.Pointer = New Native.Pointer(GetType(Integer))
             [Call]("GET_GAME_TIMER", point)
             Return point.Value
         End Get
     End Property
-    ''' <summary>
-    ''' The first native Timer, used by many vanilla scripts.
-    ''' </summary>
-    ''' <returns>Time elapsed (ms) since last reset</returns>
-    Public Shared Function GetTimerA() As Integer
-        Return [Call](Of Integer)("TIMERA")
-    End Function
-    ''' <summary>
-    ''' The second native Timer, used by many vanilla scripts.
-    ''' </summary>
-    ''' <returns>Time elapsed (ms) since last reset</returns>
-    Public Shared Function GetTimerB() As Integer
-        Return [Call](Of Integer)("TIMERB")
-    End Function
-    ''' <summary>
-    ''' The third native Timer, used only in vanilla Multiplayer scripts.
-    ''' It should be safe to set and reset value, but my suggestion is to
-    ''' create a new istance of NativeTimer, which uses the TimerC to 
-    ''' precisely Tick a sub, but without really resetting it.
-    ''' </summary>
-    ''' <returns>Time elapsed (ms) since last reset</returns>
-    Public Shared Function GetTimerC() As Integer
-        Return [Call](Of Integer)("TIMERC")
-    End Function
-    ''' <summary>
-    ''' Sets the "elapsed time" on the Timer A. Not recommended!
-    ''' It could interfere with some vanilla scripts! Please use
-    ''' TimerC or a new instance of Native Timer instead.
-    ''' </summary>
-    ''' <param name="Value">Milliseconds to set on the Timer</param>
-    Public Shared Sub SetTimerA(Value As Integer)
-        [Call]("SETTIMERA", Value)
-    End Sub
-    ''' <summary>
-    ''' Sets the "elapsed time" on the Timer B. Not recommended!
-    ''' It could interfere with some vanilla scripts! Please use
-    ''' TimerC or a new instance of NativeTimer instead.
-    ''' </summary>
-    ''' <param name="Value">Milliseconds to set on the Timer</param>
-    Public Shared Sub SetTimerB(Value As Integer)
-        [Call]("SETTIMERB", Value)
-    End Sub
-    ''' <summary>
-    ''' Sets the "elapsed time" on the Timer C. It should be safe 
-    ''' to set and reset value, but my suggestion is to create 
-    ''' a new istance of NativeTimer, which uses the TimerC to 
-    ''' precisely Tick a sub, but without really resetting it.
-    ''' </summary>
-    ''' <param name="Value">Milliseconds to set on the Timer</param>
-    Public Shared Sub SetTimerC(Value As Integer)
-        [Call]("SETTIMERC", Value)
-    End Sub
     '========================================================================================================================
     Private _lastTick As Integer
     Private _interval As Integer
@@ -110,7 +103,7 @@ Public Class NativeTimer
     Public ReadOnly Property TotalTime As Integer
         Get
             If _enabled Then
-                Return getTimerC() - _startTime
+                Return TotalGameTime - _startTime
             Else
                 _totTime = 0
                 Return _totTime
@@ -122,18 +115,18 @@ Public Class NativeTimer
     ''' </summary>
     Public ReadOnly Property TimeSinceLastTick As Integer
         Get
-            Return getTimerC() - _lastTick
+            Return TotalGameTime - _lastTick
         End Get
     End Property
     ''' <summary>
     ''' Constructor to create custom Timers.
     ''' </summary>
-    ''' <param name="Interval">Value in milliseconds.</param>
     ''' <param name="FunctionToTick">The function do you want to Tick.</param>
-    Public Sub New(Optional Interval As Integer = 500, Optional FunctionToTick As Action = Nothing)
+    ''' <param name="Interval">Value in milliseconds.</param>
+    Public Sub New(FunctionToTick As Action, Optional Interval As Integer = 500)
         _interval = Interval
         _onTick = FunctionToTick
-        _lastTick = getTimerC()
+        _lastTick = TotalGameTime
         _startTime = _lastTick
         _tickAction = AddressOf Me.OnTick
         _maxTicksCount = 0
@@ -143,7 +136,7 @@ Public Class NativeTimer
     ''' </summary>
     Public Sub Enable()
         If Not _enabled Then
-            _lastTick = getTimerC()
+            _lastTick = TotalGameTime
             _startTime = _lastTick
             TickHelper.Add_Internal(_tickAction)
             _enabled = True
@@ -159,7 +152,7 @@ Public Class NativeTimer
         End If
     End Sub
     Private Sub OnTick()
-        Dim nowMs As Integer = getTimerC()
+        Dim nowMs As Integer = TotalGameTime
         Dim delta As Integer = nowMs - _lastTick
 
         If delta >= _interval Then

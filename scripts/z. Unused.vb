@@ -883,7 +883,7 @@ End Class
 
 'GET_CAR_SPEED_VECTOR(uParam0, ref vVar3, 1);
 
-'NITRO (SCOCL)
+'NITRO (SCO)
 
 void sub_70371(unknown uParam0, unknown uParam1, int iParam2, unknown uParam3, unknown uParam4)
 {

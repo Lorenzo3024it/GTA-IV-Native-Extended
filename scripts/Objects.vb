@@ -2,6 +2,20 @@
 Imports GTA.Native.Function
 
 Public Class NativeObjects
+    Public Shared Sub AddToInteriorRoom(Obj As GTA.Object, InteriorID As Integer)
+        [Call]("ADD_OBJECT_TO_INTERIOR_ROOM_BY_KEY", Obj, InteriorID)
+    End Sub
+    Public Shared Sub AddToInteriorRoom(Obj As GTA.Object, InteriorName As String)
+        [Call]("ADD_OBJECT_TO_INTERIOR_ROOM_BY_NAME", Obj, InteriorName)
+    End Sub
+    Public Shared Sub AllocateScript(Obj As GTA.Object, ScriptName As String, Radius As Single, Optional Priority As Integer = 100, Optional Type As Integer = -1)
+        [Call]("ALLOCATE_SCRIPT", ScriptName, Obj.GetHashCode, Priority, Radius, Type)
+    End Sub
+    Public Shared Sub Anchor(Obj As GTA.Object, Optional Anchor As Boolean = True, Optional Unknown As Single = 1.0)
+        If Obj IsNot Nothing Then
+            [Call]("ANCHOR_OBJECT", Obj, Anchor, Unknown)
+        End If
+    End Sub
     Public Shared Sub AttachObjectToCar(Obj As GTA.Object, Car As Vehicle, Position As Vector3, Rotation As Vector3, Optional Unknown As Integer = 0)
         [Call]("ATTACH_OBJECT_TO_CAR", Obj, Car, Unknown, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z)
     End Sub
@@ -26,23 +40,23 @@ Public Class NativeObjects
     Public Shared Sub Freeze(Obj As GTA.Object, Optional Freeze As Boolean = True, Optional DontLoadCollision As Boolean = False)
         If Freeze Then
             If DontLoadCollision Then
-                [Call]("FREEZE_CHAR_POSITION_AND_DONT_LOAD_COLLISION", Obj, True)
+                [Call]("FREEZE_OBJECT_POSITION_AND_DONT_LOAD_COLLISION", Obj, True)
             Else
-                [Call]("FREEZE_CHAR_POSITION", Obj, True)
+                [Call]("FREEZE_OBJECT_POSITION", Obj, True)
             End If
         Else
-            [Call]("FREEZE_CHAR_POSITION", Obj, False)
-            [Call]("FREEZE_CHAR_POSITION_AND_DONT_LOAD_COLLISION", Obj, False)
+            [Call]("FREEZE_OBJECT_POSITION", Obj, False)
+            [Call]("FREEZE_OBJECT_POSITION_AND_DONT_LOAD_COLLISION", Obj, False)
         End If
     End Sub
-    Public Shared Function getClosestStealableObject(Position As Vector3, Radius As Single)
+    Public Shared Function GetClosestStealableObject(Position As Vector3, Radius As Single)
         Dim ObjPointer As Native.Pointer = New Native.Pointer(GetType(GTA.Object))
         Dim Obj As GTA.Object
         [Call]("GET_CLOSEST_STEALABLE_OBJECT", Position.X, Position.Y, Position.Z, Radius, ObjPointer)
         Obj = ObjPointer.Value
         Return Obj
     End Function
-    Public Shared Function getHeightAboveGround(Obj As Object) As Single
+    Public Shared Function GetHeightAboveGround(Obj As Object) As Single
         Try
             If Obj Is Nothing OrElse Not Obj.Exists Then Return 0.0F
 
@@ -62,13 +76,13 @@ Public Class NativeObjects
             Return 0.0F
         End Try
     End Function
-    Public Shared Function hasBeenDamaged(Obj As GTA.Object) As Boolean
+    Public Shared Function HasBeenDamaged(Obj As GTA.Object) As Boolean
         Return [Call](Of Boolean)("HAS_OBJECT_BEEN_DAMAGED", Obj)
     End Function
-    Public Shared Function hasCollidedWithAnything(Obj As GTA.Object) As Boolean
+    Public Shared Function HasCollidedWithAnything(Obj As GTA.Object) As Boolean
         Return [Call](Of Boolean)("HAS_OBJECT_COLLIDED_WITH_ANYTHING", Obj)
     End Function
-    Public Shared Function hasPhysics(Obj As GTA.Object) As Boolean
+    Public Shared Function HasPhysics(Obj As GTA.Object) As Boolean
         Return [Call](Of Boolean)("DOES_OBJECT_HAVE_PHYSICS", Obj)
     End Function
     Public Shared Function isObjectAttached(Obj As GTA.Object) As Boolean
@@ -77,15 +91,6 @@ Public Class NativeObjects
     Public Shared Function isInWater(Obj As GTA.Object) As Boolean
         Return [Call](Of Boolean)("IS_OBJECT_IN_WATER", Obj)
     End Function
-    Public Shared Sub AddToInteriorRoom(Obj As GTA.Object, InteriorID As Integer)
-        [Call]("ADD_OBJECT_TO_INTERIOR_ROOM_BY_KEY", Obj, InteriorID)
-    End Sub
-    Public Shared Sub AddToInteriorRoom(Obj As GTA.Object, InteriorName As String)
-        [Call]("ADD_OBJECT_TO_INTERIOR_ROOM_BY_NAME", Obj, InteriorName)
-    End Sub
-    Public Shared Sub AllocateScript(Obj As GTA.Object, ScriptName As String, Radius As Single, Optional Priority As Integer = 100, Optional Type As Integer = -1)
-        [Call]("ALLOCATE_SCRIPT", ScriptName, Obj.GetHashCode, Priority, Radius, Type)
-    End Sub
     Public Shared Function isTouchingObject(Obj1 As GTA.Object, Obj2 As GTA.Object) As Boolean
         Return [Call](Of Boolean)("IS_OBJECT_TOUCHING_OBJECT", Obj1, Obj2)
     End Function
@@ -120,4 +125,33 @@ Public Class NativeObjects
     '    '  If RecordsCollisions Then [Call]("SET_OBJECT_RECORDS_COLLISIONS", SpawnedObject, True)
     '    Return SpawnedObject
     'End Function
+
+
+
+    '    HAS_OBJECT_BEEN_DAMAGED
+    'HAS_OBJECT_BEEN_DAMAGED_BY_CAR
+    'HAS_OBJECT_BEEN_DAMAGED_BY_CHAR
+    'HAS_OBJECT_BEEN_DAMAGED_BY_WEAPON
+    'HAS_OBJECT_BEEN_PHOTOGRAPHED
+    'HAS_OBJECT_BEEN_UPROOTED
+    'HAS_OBJECT_COLLIDED_WITH_ANYTHING
+    'HAS_OBJECT_FRAGMENT_ROOT_BEEN_DAMAGED
+    'HAS_PLAYER_RANK_BEEN_UPGRADED
+    'HAS_POOL_OBJECT_COLLIDED_WITH_CUSHION
+    'HAS_POOL_OBJECT_COLLIDED_WITH_OBJECT
+    '    IS_OBJECT_ATTACHED
+    'IS_OBJECT_IN_ANGLED_AREA_2D
+    'IS_OBJECT_IN_ANGLED_AREA_3D
+    'IS_OBJECT_IN_AREA_2D
+    'IS_OBJECT_IN_AREA_3D
+    'IS_OBJECT_IN_WATER
+    'IS_OBJECT_ON_FIRE
+    'IS_OBJECT_ON_PLAYER_MACHINE
+    'IS_OBJECT_ON_SCREEN
+    'IS_OBJECT_PLAYING_ANIM
+    'IS_OBJECT_REASSIGNMENT_IN_PROGRESS
+    'IS_OBJECT_STATIC
+    'IS_OBJECT_TOUCHING_OBJECT
+    'IS_OBJECT_UPRIGHT
+    'IS_OBJECT_WITHIN_BRAIN_ACTIVATION_RANGE
 End Class

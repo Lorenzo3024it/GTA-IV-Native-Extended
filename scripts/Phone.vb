@@ -11,14 +11,11 @@ Public Class NativePhone
             Return [Call](Of Boolean)("IS_MOBILE_PHONE_CALL_ONGOING")
         End Get
     End Property
-
-
     Public Shared Function GetMobilePhoneID() As Integer
         Dim pointer As Native.Pointer = New Native.Pointer(GetType(Integer))
         [Call]("GET_MOBILE_PHONE_RENDER_ID", pointer)
         Return pointer.Value
     End Function
-
     Public Shared Sub StartCustomMobilePhoneRinging(RingtoneID As Ringtones)
         [Call]("START_CUSTOM_MOBILE_PHONE_RINGING", CInt(RingtoneID))
     End Sub

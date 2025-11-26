@@ -1,102 +1,68 @@
 ﻿Imports System.Collections.Concurrent
 Imports System.ComponentModel
+Imports System.Windows.Forms
 
-'Public Module TickHelperOldOld
-
-'    Private ReadOnly TickHandlers As New List(Of Action)
-'    Friend Sub Add_Internal(handler As Action)
-'        If handler Is Nothing Then Exit Sub
-'        If Not TickHandlers.Contains(handler) Then TickHandlers.Add(handler)
-'    End Sub
-'    Friend Sub Remove_Internal(handler As Action)
-'        If handler Is Nothing Then Exit Sub
-'        TickHandlers.Remove(handler)
-'    End Sub
-'    Friend Function ContainsHandler_Internal(OnTickHandler As Action) As Boolean
-'        Return TickHandlers.Contains(OnTickHandler)
-'    End Function
-'    Public Sub ProcessAll()
-'        For Each h In TickHandlers
-'            Try
-'                h.Invoke()
-'            Catch ex As Exception
-'                ' Log interno o gestione errori personalizzata
-'            End Try
-'        Next
-'    End Sub
-'    ' ▲▲▲ Fine della parte visibile pubblicamente ▲▲▲
-
-'End Module
-
-
-'Public Module TickHelperOld
-'    Friend ReadOnly _TickActions As New List(Of Action)
-'    Private _IsRunn As Boolean = False
-'    Public ReadOnly Property isRunning As Boolean
-'        Get
-'            Return getIsRunning_Internal()
-'        End Get
-'    End Property
-'    Private Function getIsRunning_Internal() As Boolean
-'        Return _IsRunn AndAlso _TickActions.Count > 0
-'    End Function
-'    Friend Sub Add_Internal(action As Action)
-'        If action IsNot Nothing AndAlso Not _TickActions.Contains(action) Then
-'            _TickActions.Add(action)
-'        End If
-'    End Sub
-'    Friend Function ContainsHandler_Internal(OnTickHandler As Action) As Boolean
-'        Return _TickActions.Contains(OnTickHandler)
-'    End Function
-'    Friend Sub Remove_Internal(action As Action)
-'        If action IsNot Nothing AndAlso _TickActions.Contains(action) Then
-'            _TickActions.Remove(action)
-'        End If
-'    End Sub
-'    Public Sub ProcessAll()
-'        If _TickActions.Count = 0 Then
-'            _IsRunn = False
-'            Exit Sub
-'        End If
-
-'        _IsRunn = True
-'        For Each action In _TickActions.ToArray()
-'            Try
-'                action.Invoke()
-'            Catch ex As Exception
-
-'            End Try
-'        Next
-
-'        _IsRunn = False
-'    End Sub
-
-'End Module
 ''' <summary>
 ''' An utility tool to process all Ticks added.
 ''' </summary>
 Public Module TickHelper
     Friend ReadOnly _TickActions As New List(Of Action)
+    Private _lastProcessed As DateTime = DateTime.MinValue
+    Private _lastProcessHadTicks As Boolean = False
+    Private _lastTickTime As DateTime = DateTime.UtcNow
+
+    ''' <summary>
+    ''' Return True if ProcessAll was ticked in last 500ms.
+    ''' </summary>
+    Public ReadOnly Property isRunning As Boolean
+        Get
+            Return (DateTime.UtcNow - _lastProcessed).TotalSeconds < 0.5
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Returns time elapsed (ms) after last tick and if 
+    ''' TickHelper had any action to process.
+    ''' </summary>
+    Public ReadOnly Property LastTick As (Integer, Boolean)
+        Get
+            Return (CInt((DateTime.UtcNow - _lastTickTime).TotalMilliseconds), _lastProcessHadTicks)
+        End Get
+    End Property
+    Public ReadOnly Property Ticks As List(Of Action)
+        Get
+            Return _TickActions
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Process all ticks added to the TickHelper.
+    ''' Works with internal ticks and NativeTimer instances.
+    ''' </summary>
     Public Sub ProcessAll()
-        If _TickActions.Count = 0 Then
-            Exit Sub
-        End If
+        _lastProcessed = DateTime.UtcNow
+        _lastProcessHadTicks = (_TickActions.Count > 0)
+        _lastTickTime = DateTime.UtcNow
+
+        If _TickActions.Count = 0 Then Exit Sub
 
         For Each action In _TickActions.ToArray()
             Try
                 action.Invoke()
             Catch ex As Exception
-
+                Tools.WriteLog("TickHelper error: cannot process ticks. " & vbCrLf & " " & ex.Message, WriteDateAndTime:=True)
             End Try
         Next
     End Sub
+
+    '------------------------------------------------------------------------------------------------------------------------
     Friend Sub Add_Internal(action As Action)
         If action IsNot Nothing AndAlso Not _TickActions.Contains(action) Then
             _TickActions.Add(action)
         End If
     End Sub
-    Friend Function ContainsHandler_Internal(OnTickHandler As Action) As Boolean
-        Return _TickActions.Contains(OnTickHandler)
+    Friend Function ContainsHandler_Internal(Action As Action) As Boolean
+        Return _TickActions.Contains(Action)
     End Function
     Friend Sub Remove_Internal(action As Action)
         If action IsNot Nothing AndAlso _TickActions.Contains(action) Then
@@ -106,84 +72,39 @@ Public Module TickHelper
 End Module
 
 
+'''' <summary>
+'''' Adds a custom Tick action.
+'''' </summary>
+'''' <param name="FunctionToTick">The function do you want to add to TickHelper.</param>
+'Public Sub Add(FunctionToTick As Action)
+'    If FunctionToTick Is Nothing Then
+'        Tools.WriteLog("TickHelper error: action " & FunctionToTick.ToString & "is not valid. Cannot be added.", WriteDateAndTime:=True)
+'    ElseIf _TickActions.Contains(FunctionToTick) Then
+'        Tools.WriteLog("TickHelper error: action " & FunctionToTick.ToString & "yet added.", WriteDateAndTime:=True)
+'    Else
+'        Add_Internal(FunctionToTick)
+'    End If
+'End Sub
+'''' <summary>
+'''' Returns True if a custom Tick action has been added to TickHelper.
+'''' </summary>
+'Public Function HasBeenAdded(FunctionToTick As Action) As Boolean
+'    Return ContainsHandler_Internal(FunctionToTick)
+'End Function
+'''' <summary>
+'''' Removes a custom Tick action.
+'''' </summary>
+'''' <param name="FunctionToTick">The function do you want to remove from TickHelper.</param>
+'Public Sub Remove(FunctionToTick As Action)
+'    If FunctionToTick Is Nothing Then
+'        Tools.WriteLog("TickHelper error: action " & FunctionToTick.ToString & "is not valid. Cannot be removed.", WriteDateAndTime:=True)
+'    ElseIf Not _TickActions.Contains(FunctionToTick) Then
+'        Tools.WriteLog("TickHelper error: action " & FunctionToTick.ToString & "still not added.", WriteDateAndTime:=True)
+'    Else
+'        Remove_Internal(FunctionToTick)
+'    End If
+'End Sub
 
-
-'Public NotInheritable Class TickHelperOLOLD
-'    Private Shared ReadOnly TickActions As New ConcurrentBag(Of Action)
-'    Private Shared ReadOnly ToRemove As New List(Of Action)
-'    ''' <summary>
-'    ''' Adds a Sub to the list of Ticks.
-'    ''' </summary>
-'    Public Shared Sub Add(OnTick As Action)
-'        If OnTick Is Nothing Then Exit Sub
-'        If Not TickActions.Contains(OnTick) Then
-'            TickActions.Add(OnTick)
-'        End If
-'    End Sub
-'    ''' <summary>
-'    ''' Removes a Sub from the list.
-'    ''' </summary>
-'    Public Shared Sub Remove(OnTick As Action)
-'        ToRemove.Add(OnTick)
-'    End Sub
-'    ''' <summary>
-'    ''' Clear all Subs from the list.
-'    ''' </summary>
-'    Public Shared Sub Clear()
-'        TickHelper.Clear()
-'    End Sub
-'    ''' <summary>
-'    ''' Runs all Subs added. Must be run in a Tick inside 
-'    ''' the main script.
-'    ''' </summary>
-'    Public Shared Sub ProcessAll()
-'        ' Rimuove le funzioni in coda di rimozione
-'        If ToRemove.Count > 0 Then
-'            Dim remaining = TickActions.Except(ToRemove).ToList()
-'            ToRemove.Clear()
-
-'            ' Rigenera la bag (ConcurrentBag non supporta Remove)
-'            Dim newBag As New ConcurrentBag(Of Action)(remaining)
-'            Threading.Interlocked.Exchange(TickActions, newBag)
-'        End If
-
-'        ' Esegue tutte le funzioni registrate
-'        For Each a In TickActions
-'            Try
-'                a.Invoke()
-'            Catch ex As Exception
-'                ' Opzionale: log degli errori
-'                ' Game.DisplayText($"Errore Tick: {ex.Message}")
-'            End Try
-'        Next
-'    End Sub
-
-'End Class
-'Public Module TickHelperAutoOLD
-'    Private ReadOnly TickHandlers As New List(Of Action)
-
-'    Public Sub Add(handler As Action)
-'        If Not TickHandlers.Contains(handler) Then TickHandlers.Add(handler)
-'    End Sub
-
-'    Public Sub Remove(handler As Action)
-'        If TickHandlers.Contains(handler) Then TickHandlers.Remove(handler)
-'    End Sub
-
-'    Public Function ContainsHandler(handler As Action) As Boolean
-'        Return TickHandlers.Contains(handler)
-'    End Function
-
-'    Public Sub ProcessTick()
-'        For Each h In TickHandlers
-'            Try
-'                h.Invoke()
-'            Catch ex As Exception
-'                ' Gestione errori/log
-'            End Try
-'        Next
-'    End Sub
-'End Module
 
 
 

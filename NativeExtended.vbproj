@@ -49,8 +49,9 @@
     <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="ScriptHookDotNet">
-      <HintPath>..\..\..\Back To The Future IV\TimeTravel Script\Scripts\Riferimenti DLL\ScriptHookDotNet.dll</HintPath>
+    <Reference Include="ScriptHookDotNet, Version=0.0.0.0, Culture=neutral, processorArchitecture=x86">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Vehicle Gauges\DLL da installare\ScriptHookDotNet.dll</HintPath>
     </Reference>
     <Reference Include="SlimDX">
       <HintPath>..\Vehicle Gauges\DLL da installare\SlimDX.dll</HintPath>
@@ -78,6 +79,7 @@
   <ItemGroup>
     <Compile Include="scripts\Debug.vb" />
     <Compile Include="scripts\Entity.vb" />
+    <Compile Include="scripts\Explosions.vb" />
     <Compile Include="scripts\Fire.vb" />
     <Compile Include="scripts\Garage.vb" />
     <Compile Include="scripts\Models.vb" />
