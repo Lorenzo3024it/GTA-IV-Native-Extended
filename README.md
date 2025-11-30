@@ -7,13 +7,19 @@
 
 ## 🔹 NativeAudio
 Handles game sound-related natives and structures.
-- **GameSound (structure)** → Contains a list of predefined in-game sounds (will be expanded in future versions).
+- **GameSound** (structure) → Contains a list of predefined in-game sounds (will be expanded in future versions).
+- **FireSound** (subclass) → Instantiable class to play fire sounds at specific world positions (not movable once started).
 
 ---
 
 ## 🔹 NativeCamera
-Provides access to camera-related native functions (position, rotation, FOV, cinematic control, etc.).
-
+Many camera-related native functions (position, rotation, FOV, cinematic control, etc.).
+You need to create a new NativeCamera instance, which is totally indipended of SHDN GTA.Camera.
+**Enums:**
+- **ShakeBehaviour** and **ShakeType** → Used by ShakeAdvanced
+- **Type** → List of known camera typed used in SCO scripts.
+- **VehicleCameras** → Vehicle camera modes, used by SetVehicleCamMode
+  
 ---
 
 ## 🔹 NativeControls
@@ -22,18 +28,17 @@ It can check the instant key down (`JustPressed = True`) or holding down (`JustP
 
 **Enums:**
 - NativeKeys → Game-specific control keys.
-- KeyValues → Standard keyboard keys.
 - MouseInputs → Mouse button inputs.
 - NavKeys → Navigation keys.
 
-**Joypad (subclass)** → Reads precise trigger pressure via SlimDX.dll; if SlimDX is not used, only detects trigger pressed state using `IsButtonPressed`.
+**Joypad** (subclass) → Reads precise trigger pressure via SlimDX.dll; if SlimDX is not used, only detects trigger pressed state using `IsButtonPressed`.
 
 ---
 
 ## 🔹 NativeDebug
 Contains various native debug-related functions (some may not work in-game).
 
-**DebugText (subclass)** → Displays useful information on-screen (player position, heading, vehicle info, etc.) and allows adding custom debug variables through `DebugText.AddCustomInfo()`.
+**DebugText** (subclass) → Displays useful information on-screen (player position, heading, vehicle info, etc.) and allows adding custom debug variables through `DebugText.AddCustomInfo()`.
 
 ---
 
@@ -41,31 +46,29 @@ Contains various native debug-related functions (some may not work in-game).
 Contains functions for drawing elements on the screen (texts, coronas, lights, etc.).
 
 **Structures:**
-- TextColors → Provide color codes.
-- TextBlips → Radar blips.
-- TextKeys → Button icons.
-
-**Color Models:**
-- ColorRGB / ColorRGBA → Represent color models for drawing.
+- **TextStyle** → Many options to customize the text displayed via DisplayTextAdvanced.
+- **TextColors**, **TextBlips**, **TextKeys** → Provide color codes, radar blips, and button icons to be used in text drawing (via DisplayText and DisplayTextAdvanced).
+- **ColorRGB** / **ColorRGBA** → Represent color models for drawing.
 
 **Subclasses:**
+- **CustomFades** → A non-native class to trigger screen fades with custom color, alpha, time and more options.
+- **GameTextures** → An instantiable class to draw game textures (not fully tested).
 - **GXT** → Draws predefined GXT strings or in-game help messages.
-- **HelpMessage** → Displays help messages.
+    - **HelpMessage** → Displays help messages.
 - **Movies** → Plays in-game cinematic videos (not fully tested).
-- **Texture** → Loads and draws predefined game textures.
+- **NativeFonts** → Functions to set the font used by DisplayTextAdvanced. DON'T LOAD MORE THAN ONE FONT!
+- **DrawManager** (internal) → Allows to set the draw duration for many elements (you must call TickHelper.ProcessAll() in the main script tick)
 
 ---
 
 ## 🔹 NativeEntity
 A non-native class used to instantiate any in-game entity (vehicles, peds, objects) as a generic Entity (similar to GTA V).  
 It's used in some internal functions (like `NativeGeneric.DeletionList`) but can also be used in custom external scripts.
-
+---> Temporarily removed <---
 ---
 
 ## 🔹 NativeFire
-Native functions for creating and extinguishing scripted fires.
-
-**FireSound (subclass)** → Instantiable class to play fire sounds at specific world positions (not movable once started).
+Native functions for creating and extinguishing scripted fires. Now you have to instantiate it to manage it without game issues.
 
 ---
 
@@ -81,7 +84,7 @@ A set of mixed native functions (pause menu, random int/float generation, etc.).
 
 **Subclasses:**
 - **Cheats** → Activates in-game cheats using `CheatIndex` enum and can reset the “TimeCheated” stat.
-- **DeletionList** → Manages entity cleanup lists using both native and non-native methods. Non-native ones are recommended, as they allow parallel, independent lists.
+- **DeletionList** → Manages entity cleanup lists using both native and non-native methods. Non-native ones are recommended, as they allow parallel, independent lists.  ---> Temporarily removed <---
 
 ---
 
@@ -97,7 +100,7 @@ Contains Flash functions and an internal tick system linked to TickHelper.
 ## 🔹 NativeModels
 Contains all model-related natives (`Request`, `HasModelLoaded`, `GetHashKey`, etc.).
 
-**SpatialHelper (subclass)** → Provides native and non-native functions to get model hitboxes and dimensions in world space.
+**SpatialHelper** (subclass) → Provides native and non-native functions to get model hitboxes and dimensions in world space.
 
 ---
 
