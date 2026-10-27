@@ -6,11 +6,13 @@ Imports GTA.Native
 Imports GTA.Native.Function
 Imports NativeExtended.NativeControls
 Public Class NativeDebug
-    Public Shared Function AreWidescreenBordersActive() As Boolean
-        Return [Call](Of Boolean)("ARE_WIDESCREEN_BORDERS_ACTIVE")
-    End Function
+    Public Shared ReadOnly Property AreWidescreenBordersActive As Boolean
+        Get
+            Return [Call](Of Boolean)("ARE_WIDESCREEN_BORDERS_ACTIVE")
+        End Get
+    End Property
     ''' <summary>
-    ''' Drag mouse to rotate camera, use Scrollwheel to zoom and double left mouse click to teleport the player.
+    ''' Untested. Drag mouse to rotate camera, use Scrollwheel to zoom and double left mouse click to teleport the player.
     ''' </summary>
     Public Shared Property DebugCamera As Boolean
         Get
@@ -25,51 +27,48 @@ Public Class NativeDebug
         End Set
     End Property
     ''' <summary>
-    ''' If True, will be displayed in-game messages if any script catches an Exception.
+    ''' If True, will be displayed in-game messages if any script catches an Exception (not for every function).
     ''' </summary>
     Public Shared Property DisplayErrors As Boolean = False
-    Public Shared Sub EnableHighDOF(Enable As Boolean)
-        [Call]("SET_USE_HIGHDOF", Enable)
-    End Sub
+    Public Shared WriteOnly Property HighDOF As Boolean
+        Set(value As Boolean)
+            [Call]("SET_USE_HIGHDOF", value)
+        End Set
+    End Property
     ''' <summary>
     ''' Disables rendering of all lights on vehicles.
     ''' </summary>
-    Public Shared Sub ForceAllVehicleLightsOFF(Optional NoVehicleLights As Boolean = True)
-        [Call]("FORCE_ALL_VEHICLE_LIGHTS_OFF", NoVehicleLights)
-    End Sub
+    Public Shared WriteOnly Property ForceAllVehicleLightsOFF As Boolean
+        Set(value As Boolean)
+            [Call]("FORCE_ALL_VEHICLE_LIGHTS_OFF", value)
+        End Set
+    End Property
     ''' <summary>
     ''' Untested. Find only in races_cr SCO script.
     ''' </summary>
-    Public Shared Sub ForceHighLOD(Optional Enable As Boolean = True)
-        [Call]("FORCE_HIGH_LOD", Enable)
-    End Sub
+    Public Shared WriteOnly Property HighLOD As Boolean
+        Set(value As Boolean)
+            [Call]("FORCE_HIGH_LOD", value)
+        End Set
+    End Property
     ''' <summary>
     ''' Find only in policetest SCO script, but seems not working.
     ''' </summary>
     Public Shared Sub SetRenderFlags(Unknown1 As Boolean, Unknown2 As Boolean, Unknown3 As Boolean, Unknown4 As Boolean)
         [Call]("SET_GLOBAL_RENDER_FLAGS", Unknown1, Unknown2, Unknown3, Unknown4)
     End Sub
+
     Public Shared Sub SetWidescreenBorders(Enable As Boolean, Optional Immediately As Boolean = False)
         If Immediately Then [Call]("SET_INSTANT_WIDESCREEN_BORDERS", Enable) Else [Call]("SET_WIDESCREEN_BORDERS", Enable)
     End Sub
-
-    'Public Shared Function isDebugCameraEnabled() As Boolean
-    '    Return [Call](Of Boolean)("IS_DEBUG_CAMERA_ON")
-    'End Function
-    'Public Shared Sub EnableDebugCamera(Optional Enable As Boolean = True)
-    '    If Enable Then
-    '        [Call]("ENABLE_DEBUG_CAM", True)
-    '    Else
-    '        If [Call](Of Boolean)("IS_DEBUG_CAMERA_ON") Then [Call]("DISABLE_DEBUG_CAM_AND_PLAYER_WARPING", True)
-    '    End If
-    'End Sub
     ''' <summary>
     ''' Not found in SCO scripts. Seems not working.
     ''' </summary>
-    Public Shared Sub EnableShadows(ShadowsON As Boolean)
-        [Call]("ENABLE_SHADOWS", ShadowsON)
-    End Sub
-
+    Public Shared WriteOnly Property [Shadows] As Boolean
+        Set(value As Boolean)
+            [Call]("ENABLE_SHADOWS", value)
+        End Set
+    End Property
     '''' <summary>
     '''' Classe di debug per disegnare un checkpoint sulla posizione del giocatore.
     '''' Controllabile con NUMPAD + / −, gestita tramite TickHelper.
@@ -419,7 +418,6 @@ Public Class NativeDebug
     '        Return New Vector3(basePos.X + worldX, basePos.Y + worldY, basePos.Z + localOffset.Z)
     '    End Function
     'End Classì
-
     ''' <summary>
     ''' A simple non-native class to draw debug infos.
     ''' You must call TickHelper.ProcessAll() in a Tick inside your

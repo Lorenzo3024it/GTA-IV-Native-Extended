@@ -1,8 +1,10 @@
 ﻿Imports System.CodeDom
+Imports System.Windows.Forms
 Imports GTA
 Imports GTA.Native.Function
-Public Class NativeModels
-    Private Shared _tempRequestedModel As String
+Imports NativeExtended.NativeVehicle
+Public Class NativeModel
+    ' Private Shared ReadOnly _tempRequestedModel As String
     Public Shared ReadOnly Property CurrentCopModel As Integer
         Get
             '  Return getCurrentCopModel()
@@ -56,73 +58,137 @@ Public Class NativeModels
         [Call]("DONT_SUPPRESS_ANY_CAR_MODELS")
     End Sub
     ''' <summary>
-    ''' Untested
+    ''' Untested.
     ''' </summary>
     Public Shared Sub DontSuppressCarModel(Model As String)
-        [Call]("DONT_SUPPRESS_CAR_MODEL", getHashKey(Model))
+        [Call]("DONT_SUPPRESS_CAR_MODEL", GetHashKey(Model))
     End Sub
     ''' <summary>
-    ''' Untested
+    ''' Untested.
     ''' </summary>
     Public Shared Sub DontSuppressPedModel(Model As String)
-        [Call]("DONT_SUPPRESS_PED_MODEL", getHashKey(Model))
+        [Call]("DONT_SUPPRESS_PED_MODEL", GetHashKey(Model))
     End Sub
-    Public Shared Function GetDisplayNameFromVehicleModel(Model As String) As String
-        Return [Call](Of String)("GET_DISPLAY_NAME_FROM_VEHICLE_MODEL", GetHashKey(Model))
+    ''' <summary>
+    ''' Returns vehicle name, optionally returning raw name (GameName from IDE file).
+    ''' </summary>
+    ''' <returns></returns>
+    Public Shared Function GetDisplayNameFromVehicleModel(Model As String, Optional ReturnRawName As Boolean = False) As String
+        Dim RawName As String = [Call](Of String)("GET_DISPLAY_NAME_FROM_VEHICLE_MODEL", GetHashKey(Model))
+        If ReturnRawName Then
+            Return RawName
+        Else
+            Return NativeDraws.GXT.GetString(RawName)
+        End If
     End Function
     Public Shared Function GetHashKey(Model As String) As Integer
         Return [Call](Of Integer)("GET_HASH_KEY", Model)
     End Function
-    Public Shared Function GetStringFromHash(HashKey As Integer) As String
-        Return [Call](Of String)("GET_STRING_FROM_HASH_KEY", HashKey)
-    End Function
-    Public Shared Function GetRandomCarModelInMemory(Optional OnlyCars As Boolean = True) As Integer
+    'Public Shared Function GetStringFromHash(HashKey As Integer) As String
+    '    Return [Call](Of String)("GET_STRING_FROM_HASH_KEY", HashKey)
+    'End Function
+    Public Shared Function GetRandomCarModelInMemory(Optional Cars As Boolean = True, Optional Bikes As Boolean = False, Optional Boats As Boolean = False,
+                                                     Optional Helis As Boolean = False, Optional Planes As Boolean = False) As Integer
+
         Dim modelHash As Native.Pointer = New Native.Pointer(GetType(Integer))
         Dim modelIndex As Native.Pointer = New Native.Pointer(GetType(Integer))
+
         modelHash.Value = 0
         modelIndex.Value = 1
 
         [Call]("GET_RANDOM_CAR_MODEL_IN_MEMORY", 1, modelHash, modelIndex)
 
-        If modelIndex.Value = -1 Then Return 0
-        If OnlyCars Then
-            If [Call](Of Boolean)("IS_THIS_MODEL_A_HELI", modelHash) OrElse [Call](Of Boolean)("IS_THIS_MODEL_A_BIKE", modelHash) OrElse [Call](Of Boolean)("IS_THIS_MODEL_A_BOAT", modelHash) Then
-                Return 0
-            End If
+        If modelIndex.Value = -1 Then
+            Return 0
         End If
 
-        Return modelHash.Value
+        Dim isCar As Boolean = Not [Call](Of Boolean)("IS_THIS_MODEL_A_HELI", modelHash) AndAlso
+                               Not [Call](Of Boolean)("IS_THIS_MODEL_A_BIKE", modelHash) AndAlso
+                               Not [Call](Of Boolean)("IS_THIS_MODEL_A_BOAT", modelHash)
 
+        Dim isBike As Boolean = [Call](Of Boolean)("IS_THIS_MODEL_A_BIKE", modelHash)
+        Dim isBoat As Boolean = [Call](Of Boolean)("IS_THIS_MODEL_A_BOAT", modelHash)
+        Dim isHeli As Boolean = [Call](Of Boolean)("IS_THIS_MODEL_A_HELI", modelHash)
+        Dim isPlane As Boolean = [Call](Of Boolean)("IS_THIS_MODEL_A_PLANE", modelHash)
+
+        If (isCar AndAlso Cars) OrElse
+       (isBike AndAlso Bikes) OrElse
+       (isBoat AndAlso Boats) OrElse
+       (isHeli AndAlso Helis) OrElse
+       (isPlane AndAlso Planes) Then
+
+            Return modelHash.Value
+        End If
+
+        Return 0
     End Function
-    Public Shared Function HasModelLoaded(Model As String) As Boolean
-        Return [Call](Of Boolean)("HAS_MODEL_LOADED", getHashKey(Model))
+    Public Shared Function GetVehicleModel(ModelHash As Integer) As String
+        Try
+            Dim vehicle As IDE.VehicleData = IDE.GetVehicleData(ModelHash)
+
+            If vehicle Is Nothing Then
+                Tools.WriteLog("Error in NativeModel.GetVehicleModel(Hash " & ModelHash & "): vehicle not found or not valid.")
+                Return Nothing
+            End If
+            Return vehicle.Model
+
+        Catch ex As Exception
+            Tools.WriteLog("Error in NativeModel.GetVehicleModel(Hash " & ModelHash & ").", ex)
+            Return Nothing
+        End Try
     End Function
-    Public Shared Function DoesExistsInCD_Image(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_MODEL_IN_CDIMAGE", getHashKey(Model))
+    Public Shared Function GetVehicleModel(Vehicle As Vehicle) As String
+        Try
+            If Vehicle Is Nothing Then
+                Tools.WriteLog("Error in NativeModel.GetVehicleModel: vehicle not found or not valid.")
+                Return Nothing
+            End If
+
+            Dim pointer1 As New Native.Pointer(GetType(Integer))
+            [Call]("GET_CAR_MODEL", Vehicle, pointer1)
+            Return GetVehicleModel(CInt(pointer1.Value))
+        Catch ex As Exception
+            Tools.WriteLog("Error in NativeModel.GetVehicleModel.", ex)
+            Return Nothing
+        End Try
     End Function
-    Public Shared Function isBike(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_THIS_MODEL_A_BIKE", Model)
+    Public Shared Function IsLoaded(Model As String) As Boolean
+        Return [Call](Of Boolean)("HAS_MODEL_LOADED", GetHashKey(Model))
     End Function
-    Public Shared Function isBoat(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_THIS_MODEL_A_BOAT", Model)
+    ''' <summary>
+    ''' Returns True if model is installed in IMG archive.
+    ''' </summary>
+    Public Shared Function IsValid(Model As String) As Boolean
+        Try
+            Return [Call](Of Boolean)("IS_MODEL_IN_CDIMAGE", GetHashKey(Model))
+        Catch ex As Exception
+            Tools.WriteLog("Error in NativeModel.IsValid.", ex)
+            Return False
+        End Try
     End Function
-    Public Shared Function isCar(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_THIS_MODEL_A_CAR", Model)
+    Public Shared Function IsBike(ModelHash As Integer) As Boolean
+        Return [Call](Of Boolean)("IS_THIS_MODEL_A_BIKE", ModelHash)
     End Function
-    Public Shared Function isHeli(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_THIS_MODEL_A_HELI", Model)
+    Public Shared Function IsBoat(ModelHash As Integer) As Boolean
+        Return [Call](Of Boolean)("IS_THIS_MODEL_A_BOAT", ModelHash)
     End Function
-    Public Shared Function isPed(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_THIS_MODEL_A_PED", Model)
+    Public Shared Function IsCar(ModelHash As Integer) As Boolean
+        Return [Call](Of Boolean)("IS_THIS_MODEL_A_CAR", ModelHash)
     End Function
-    Public Shared Function isPlane(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_THIS_MODEL_A_PLANE", Model)
+    Public Shared Function IsHeli(ModelHash As Integer) As Boolean
+        Return [Call](Of Boolean)("IS_THIS_MODEL_A_HELI", ModelHash)
     End Function
-    Public Shared Function isTrain(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_THIS_MODEL_A_TRAIN", Model)
+    Public Shared Function IsPed(ModelHash As Integer) As Boolean
+        Return [Call](Of Boolean)("IS_THIS_MODEL_A_PED", ModelHash)
     End Function
-    Public Shared Function isVehicle(Model As String) As Boolean
-        Return [Call](Of Boolean)("IS_THIS_MODEL_A_VEHICLE", Model)
+    Public Shared Function IsPlane(ModelHash As Integer) As Boolean
+        Return [Call](Of Boolean)("IS_THIS_MODEL_A_PLANE", ModelHash)
+    End Function
+    Public Shared Function IsTrain(ModelHash As Integer) As Boolean
+        Return [Call](Of Boolean)("IS_THIS_MODEL_A_TRAIN", ModelHash)
+    End Function
+    Public Shared Function IsVehicle(ModelHash As Integer) As Boolean
+        Return [Call](Of Boolean)("IS_THIS_MODEL_A_VEHICLE", ModelHash)
     End Function
     Public Shared Sub ReducePedModelBudget(Optional Reduce As Boolean = True)
         [Call]("SET_REDUCE_PED_MODEL_BUDGET", Reduce)
@@ -130,14 +196,15 @@ Public Class NativeModels
     Public Shared Sub ReduceVehicleModelBudget(Optional Reduce As Boolean = True)
         [Call]("SET_REDUCE_VEHICLE_MODEL_BUDGET", Reduce)
     End Sub
-    Public Shared Sub Relase(Model As String)
-        [Call]("MARK_MODEL_AS_NO_LONGER_NEEDED", getHashKey(Model))
+    Public Shared Sub Release(Model As String)
+        If IsLoaded(Model) Then [Call]("MARK_MODEL_AS_NO_LONGER_NEEDED", GetHashKey(Model))
     End Sub
     Public Shared Sub Request(Model As String)
-        If doesExistsInCD_Image(Model) Then
-            [Call]("REQUEST_MODEL", getHashKey(Model))
+        If IsValid(Model) Then
+            [Call]("REQUEST_MODEL", GetHashKey(Model))
         Else
-            NativeDraws.DisplayText(NativeDraws.TextColors.MP_Red.ToString & "Invalid model! Cannot request " & NativeDraws.TextColors.MP_Orange.ToString & Model & NativeDraws.TextColors.MP_Red.ToString & " model.", 5000)
+            'NativeDraws.DisplayText(NativeDraws.TextColors.MP_Red.ToString & "Invalid model! Cannot request " & NativeDraws.TextColors.MP_Orange.ToString & Model & NativeDraws.TextColors.MP_Red.ToString & " model.", 5000)
+            Tools.WriteLog("Error in NativeModel.Request: Invalid model! Cannot request '" & Model & "' model.")
         End If
     End Sub
     'Public Shared Function Request2(Model As String) As Boolean
@@ -149,7 +216,7 @@ Public Class NativeModels
     '    ' Else
     '    '  NativeDraws.DisplayText(NativeDraws.TextColors.MP_Red.ToString & "Invalid model! Cannot request " & NativeDraws.TextColors.MP_Orange.ToString & Model & NativeDraws.TextColors.MP_Red.ToString & " model.", 5000)
     '    '  End If
-    '    Return NativeModels.hasModelLoaded(getHashKey(Model))
+    '    Return NativeModel.hasModelLoaded(getHashKey(Model))
     'End Function
     'Private Shared Sub OnTick()
     '    If Not [Call](Of Boolean)("HAS_MODEL_LOADED", getHashKey(_tempRequestedModel)) Then
@@ -183,33 +250,33 @@ Public Class NativeModels
         ''' Returns minimum and maximum vector of local model's bounding box.
         ''' Uses the Native Function GET_MODEL_DIMENSIONS(Vector3, Vector3)
         ''' </summary>
-        Public Shared Function GetModelHitbox(Model As String) As (Min As Vector3, Max As Vector3)
+        Public Shared Function GetModelHitbox(ModelHash As Integer) As (Min As Vector3, Max As Vector3)
             Dim pointer1 As Native.Pointer = New Native.Pointer(GetType(Single))
             Dim pointer2 As Native.Pointer = New Native.Pointer(GetType(Single))
             Dim pointer3 As Native.Pointer = New Native.Pointer(GetType(Single))
             Dim pointer4 As Native.Pointer = New Native.Pointer(GetType(Single))
             Dim pointer5 As Native.Pointer = New Native.Pointer(GetType(Single))
             Dim pointer6 As Native.Pointer = New Native.Pointer(GetType(Single))
-            Native.Function.Call("GET_MODEL_DIMENSIONS", Model, pointer1, pointer2, pointer3, pointer4, pointer5, pointer6)
+            Native.Function.Call("GET_MODEL_DIMENSIONS", ModelHash, pointer1, pointer2, pointer3, pointer4, pointer5, pointer6)
             Return (New Vector3(pointer1.Value, pointer2.Value, pointer3.Value), New Vector3(pointer4.Value, pointer5.Value, pointer6.Value))
         End Function
         ''' <summary>
         ''' Returns Width, Lenght, Height
         ''' </summary>
-        Public Shared Function GetSize(modelHash As Integer) As Vector3
-            Dim dims = GetModelHitbox(modelHash)
+        Public Shared Function GetSize(ModelHash As Integer) As Vector3
+            Dim dims = GetModelHitbox(ModelHash)
             Return New Vector3(
                 Math.Abs(dims.Max.X - dims.Min.X),
                 Math.Abs(dims.Max.Y - dims.Min.Y),
                 Math.Abs(dims.Max.Z - dims.Min.Z)
             )
         End Function
-        Public Shared Function GetWidth(modelHash As Integer) As Single
-            Dim dims = GetModelHitbox(modelHash)
+        Public Shared Function GetWidth(ModelHash As Integer) As Single
+            Dim dims = GetModelHitbox(ModelHash)
             Return Math.Abs(dims.Max.X - dims.Min.X)
         End Function
-        Public Shared Function GetlLength(modelHash As Integer) As Single
-            Dim dims = GetModelHitbox(modelHash)
+        Public Shared Function GetlLength(ModelHash As Integer) As Single
+            Dim dims = GetModelHitbox(ModelHash)
             Return Math.Abs(dims.Max.Y - dims.Min.Y)
         End Function
         Public Shared Function GetHeight(modelHash As Integer) As Single

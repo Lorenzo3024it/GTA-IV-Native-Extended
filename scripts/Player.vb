@@ -1,13 +1,21 @@
 ﻿Imports System.Reflection
 Imports GTA
+Imports GTA.base
 Imports GTA.Native.Function
+Imports NativeExtended.NativeHud
+Imports NativeExtended.NativeScript
 
-Public Class NativePlayer
+Public NotInheritable Class NativePlayer
+    Private Sub New()
+    End Sub
+    Private Shared ReadOnly pointerPlayerChar As New Native.Pointer(GetType(Ped))
+    Private Shared ReadOnly pointerMoney As New Native.Pointer(GetType(Integer))
+
     Public Enum PlayerMoods
         Normal = 0
         Happy = 1
-        Angry = 2
-        Angry2 = 3
+        PissedOff = 2
+        Angry = 3
         PoliceChase = 4
         Thinking = 5
         Suprised = 6
@@ -15,352 +23,83 @@ Public Class NativePlayer
         HeavyBreath = 8
         LookAround = 9
     End Enum
+
     Public Shared Sub AirDragMultiplierForCars(Multiplier As Double)
-        [Call]("FORCE_AIR_DRAG_MULT_FOR_PLAYERS_CAR", NativePlayer.Index, Multiplier)
+        [Call]("FORCE_AIR_DRAG_MULT_FOR_PLAYERS_CAR", Index, Multiplier)
     End Sub
-    Public Shared WriteOnly Property CanLockOn As Boolean
-        Set(value As Boolean)
-            [Call]("DISABLE_PLAYER_LOCKON", Index, Not value)
-        End Set
-    End Property
-    Public Shared WriteOnly Property CanPickupObjects As Boolean
-        Set(value As Boolean)
-            [Call]("ALLOW_PLAYER_TO_CARRY_NON_MISSION_OBJECTS", Index, value)
-        End Set
-    End Property
-    Public Shared WriteOnly Property DisableSprint As Boolean
-        Set(value As Boolean)
-            [Call]("DISABLE_PLAYER_SPRINT", Index, value)
-        End Set
-    End Property
+
     Public Shared WriteOnly Property CanBeHassledByGangs As Boolean
         Set(value As Boolean)
-            [Call]("SET_PLAYER_CAN_BE_HASSLED_BY_GANGS", index, value)
+            [Call]("SET_PLAYER_CAN_BE_HASSLED_BY_GANGS", Index, value)
         End Set
     End Property
+
+    Public Shared ReadOnly Property CanControlCharacter As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_CONTROL_ON", Index)
+        End Get
+    End Property
+
     Public Shared WriteOnly Property CanControlRagdoll As Boolean
         Set(value As Boolean)
             [Call]("GIVE_PLAYER_RAGDOLL_CONTROL", Index, value)
         End Set
     End Property
+
     Public Shared WriteOnly Property CanDoDriveBy As Boolean
         Set(value As Boolean)
-            [Call]("SET_PLAYER_CAN_DO_DRIVE_BY", index, value)
+            [Call]("SET_PLAYER_CAN_DO_DRIVE_BY", Index, value)
         End Set
     End Property
+
+    Public Shared WriteOnly Property CanLockOn As Boolean
+        Set(value As Boolean)
+            [Call]("DISABLE_PLAYER_LOCKON", Index, Not value)
+        End Set
+    End Property
+
+    Public Shared WriteOnly Property CanPickupObjects As Boolean
+        Set(value As Boolean)
+            [Call]("ALLOW_PLAYER_TO_CARRY_NON_MISSION_OBJECTS", Index, value)
+        End Set
+    End Property
+
+    Public Shared WriteOnly Property CanSprint As Boolean
+        Set(value As Boolean)
+            [Call]("DISABLE_PLAYER_SPRINT", Index, Not value)
+        End Set
+    End Property
+
     Public Shared WriteOnly Property CanUseCover As Boolean
         Set(value As Boolean)
-            [Call]("SET_PLAYER_CAN_USE_COVER", index, value)
+            [Call]("SET_PLAYER_CAN_USE_COVER", Index, value)
         End Set
     End Property
+
     Public Shared ReadOnly Property Character As Ped
         Get
-            Dim PlayerChar As Native.Pointer = New Native.Pointer(GetType(Ped))
-            [Call]("GET_PLAYER_CHAR", index, PlayerChar)
-            Return PlayerChar.Value
+            [Call]("GET_PLAYER_CHAR", Index, pointerPlayerChar)
+            Return pointerPlayerChar.Value
         End Get
     End Property
-    Public Shared Sub ClearHasDamagedAnyPed()
-        [Call]("CLEAR_PLAYER_HAS_DAMAGED_AT_LEAST_ONE_PED", index)
+
+    Public Shared Sub ClearHasDamaged(Optional Peds As Boolean = False, Optional Vehicles As Boolean = False)
+        If Peds Then [Call]("CLEAR_PLAYER_HAS_DAMAGED_AT_LEAST_ONE_PED", Index)
+        If Vehicles Then [Call]("CLEAR_PLAYER_HAS_DAMAGED_AT_LEAST_ONE_VEHICLE", Index)
     End Sub
-    Public Shared Sub ClearHasDamagedAnyVehicle()
-        [Call]("CLEAR_PLAYER_HAS_DAMAGED_AT_LEAST_ONE_VEHICLE", index)
-    End Sub
-    Public Shared Sub FakeDeathArrest()
-        [Call]("FAKE_DEATHARREST")
-    End Sub
+
     Public Shared WriteOnly Property FastReload As Boolean
         Set(value As Boolean)
-            [Call]("SET_PLAYER_FAST_RELOAD", index, value)
+            [Call]("SET_PLAYER_FAST_RELOAD", Index, value)
         End Set
     End Property
-    'Public Shared Function getplayerindex() As Integer
-    '    Dim PlayerID As Integer = [Call](Of Integer)("GET_PLAYER_ID")
-    '    Return [Call](Of Integer)("CONVERT_INT_TO_PLAYERINDEX", PlayerID)
-    'End Function
-    Public Shared Function GetTrainPlayerWouldEnter() As Vehicle
-        Dim pointer As Native.Pointer = New Native.Pointer(GetType(Vehicle))
-        [Call]("GET_TRAIN_PLAYER_WOULD_ENTER", Index, pointer)
-        If pointer.Value IsNot Nothing Then
-            Return pointer.Value
-        Else
-            Return Nothing
-        End If
-    End Function
-    Public Shared Function HasCollectedPickup(Pickup As Pickup) As Boolean
-        Return [Call](Of Boolean)("HAS_PLAYER_COLLECTED_PICKUP", Index, Pickup)
-    End Function 'testare
-    Public Shared ReadOnly Property HasDamagedAtLeastOneVehicle As Boolean
-        Get
-            Return [Call](Of Boolean)("HAS_PLAYER_DAMAGED_AT_LEAST_ONE_VEHICLE")
-        End Get
-    End Property
-    Public Shared Function HasDeatharrestExecuted() As Boolean
-        Return [Call](Of Boolean)("HAS_DEATHARREST_EXECUTED")
-    End Function
-    Public Shared ReadOnly Property HasFlashingWantedLevelStars() As Boolean
-        Get
-            Return [Call](Of Boolean)("PLAYER_HAS_FLASHING_STARS_ABOUT_TO_DROP", NativePlayer.Index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property HasGreyedWantedLevelStars() As Boolean
-        Get
-            Return [Call](Of Boolean)("PLAYER_HAS_GREYED_OUT_STARS", NativePlayer.Index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property Index As Integer
-        Get
-            Dim PlayerID As Integer = [Call](Of Integer)("GET_PLAYER_ID")
-            Return [Call](Of Integer)("CONVERT_INT_TO_PLAYERINDEX", PlayerID)
-        End Get
-    End Property
-    Public Shared WriteOnly Property IgnoredByPeds As Boolean
-        Set(value As Boolean)
-            [Call]("SET_EVERYONE_IGNORE_PLAYER", index, value)
-        End Set
-    End Property
-    Public Shared WriteOnly Property IgnoredByPolice As Boolean
-        Set(value As Boolean)
-            [Call]("SET_POLICE_IGNORE_PLAYER", Index, value)
-        End Set
-    End Property
-    Public Shared ReadOnly Property isBeingArrested As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_PLAYER_BEING_ARRESTED")
-        End Get
-    End Property '
-    Public Shared ReadOnly Property isDead As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_PLAYER_DEAD", Index)
-        End Get
-    End Property
-    Public Shared Function isFreeAimingAtPed(Ped As Ped) As Boolean
-        Return [Call](Of Boolean)("IS_PLAYER_FREE_AIMING_AT_CHAR", Index, Ped)
-    End Function
-    Public Shared ReadOnly Property isFreeForAmbientTask As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_PLAYER_FREE_FOR_AMBIENT_TASK", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property isPlayingMinigame As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_MINIGAME_IN_PROGRESS")
-        End Get
-    End Property
-    Public Shared ReadOnly Property isInInterior As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_INTERIOR_SCENE")
-        End Get
-    End Property
-    Public Shared ReadOnly Property isTargettingChar As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_PLAYER_TARGETTING_CHAR", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property isTargettingAnything As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_PLAYER_TARGETTING_ANYTHING", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property isTargettingObject As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_PLAYER_TARGETTING_OBJECT", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property isPressingHorn As Boolean
-        Get
-            Return [Call](Of Boolean)("IS_PLAYER_PRESSING_HORN", index)
-        End Get
-    End Property
-    Public Shared WriteOnly Property KeepsWeaponsWhenRespawned As Boolean
-        Set(value As Boolean)
-            [Call]("SET_PLAYER_KEEPS_WEAPONS_WHEN_RESPAWNED", value)
-        End Set
-    End Property
-    Public Shared WriteOnly Property NeverGetsTired As Boolean
-        Set(value As Boolean)
-            [Call]("SET_PLAYER_NEVER_GETS_TIRED", index, value)
-        End Set
-    End Property
-    Public Shared ReadOnly Property NumberOfPedsKilled As Integer
-        Get
-            Return [Call](Of Integer)("GET_TOTAL_NUMBER_OF_PEDS_KILLED_BY_PLAYER", index)
-        End Get
-    End Property
-    Public Shared WriteOnly Property GroupAlwaysFollow As Boolean
-        Set(value As Boolean)
-            [Call]("SET_PLAYER_GROUP_TO_FOLLOW_ALWAYS", Index, value)
-        End Set
-    End Property
-    Public Shared ReadOnly Property TimeSinceLastArrest As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_LAST_ARREST", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property TimeSinceLastDeath As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_LAST_DEATH", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property TimeSinceDroveAgainstTraffic As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_DROVE_AGAINST_TRAFFIC", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property TimeSinceDroveOnPavement As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_DROVE_ON_PAVEMENT", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property TimeSinceRanLight As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_RAN_LIGHT", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property TimeSinceHitBuilding As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_HIT_BUILDING", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property TimeSinceHitPed As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_HIT_PED", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property TimeSinceHitObject As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_HIT_OBJECT", index)
-        End Get
-    End Property
-    Public Shared ReadOnly Property TimeSinceHitVehicle As Integer
-        Get
-            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_HIT_BUILDING", index)
-        End Get
-    End Property
-    'IS_PLAYER_CLIMBING
-    'IS_PLAYER_CONTROL_ON
-    'IS_PLAYER_DEAD
-    'IS_PLAYER_FREE_AIMING_AT_CHAR
-    'IS_PLAYER_FREE_FOR_AMBIENT_TASK
-    'IS_PLAYER_IN_INFO_ZONE
-    'IS_PLAYER_IN_POSITION_FOR_CONVERSATION
-    'IS_PLAYER_IN_REMOTE_MODE
-    'IS_PLAYER_IN_SHORTCUT_TAXI
-    'IS_PLAYER_LOGGING_IN_NP
-    'IS_PLAYER_ONLINE
-    'IS_PLAYER_ONLINE_GAMESPY
-    'IS_PLAYER_ONLINE_NP
-    'IS_PLAYER_PERFORMING_STOPPIE
-    'IS_PLAYER_PERFORMING_WHEELIE
-    'IS_PLAYER_PLAYING
-    'IS_PLAYER_PRESSING_HORN
-    'IS_PLAYER_READY_FOR_CUTSCENE
-    'IS_PLAYER_SCRIPT_CONTROL_ON
-    'IS_PLAYER_SIGNED_IN_LOCALLY
-    'IS_PLAYER_TARGETTING_ANYTHING
-    'IS_PLAYER_TARGETTING_CHAR
-    'IS_PLAYER_TARGETTING_OBJECT
-    'IS_PLAYER_USING_JETPACK
 
-    'PLAYER_HAS_FLASHING_STAR_AFTER_OFFENCE
-    'PLAYER_HAS_FLASHING_STARS_ABOUT_TO_DROP
-    'PLAYER_HAS_GREYED_OUT_STARS
-    'PLAYER_IS_INTERACTING_WITH_GARAGE
-    'PLAYER_IS_NEAR_FIRST_PIGEON
-    'PLAYER_IS_PISSED_OFF
-    'PLAYER_WANTS_TO_JOIN_NETWORK_GAME
-
-    'REGISTER_PLAYER_RESPAWN_COORDS
-    'https://gtamods.com/wiki/SET_EVERYONE_IGNORE_PLAYER
-    'SET_HAS_BEEN_OWNED_BY_PLAYER
-
-    '    SET_PLAYER_CAN_BE_HASSLED_BY_GANGS
-    'SET_PLAYER_CAN_DO_DRIVE_BY
-    'SET_PLAYER_CAN_DROP_WEAPONS_IN_CAR
-    'SET_PLAYER_CAN_USE_COVER
-    'SET_PLAYER_COLOUR
-    'SET_PLAYER_CONTROL
-    'SET_PLAYER_CONTROL_ADVANCED
-    'SET_PLAYER_CONTROL_FOR_AMBIENT_SCRIPT
-    'SET_PLAYER_CONTROL_FOR_NETWORK
-    'SET_PLAYER_CONTROL_FOR_TEXT_CHAT
-    'SET_PLAYER_CONTROL_ON_IN_MISSION_CLEANUP
-    'SET_PLAYER_FAST_RELOAD
-    'SET_PLAYER_GROUP_RECRUITMENT
-    'SET_PLAYER_GROUP_TO_FOLLOW_ALWAYS
-    'SET_PLAYER_GROUP_TO_FOLLOW_NEVER
-    'SET_PLAYER_ICON_COLOUR
-    'SET_PLAYER_INVINCIBLE
-    'SET_PLAYER_INVISIBLE_TO_AI
-    'SET_PLAYER_IS_IN_STADIUM
-    'SET_PLAYER_KEEPS_WEAPONS_WHEN_RESPAWNED
-    'SET_PLAYER_MAY_ONLY_ENTER_THIS_VEHICLE
-    'SET_PLAYER_NEVER_GETS_TIRED
-    'SET_PLAYER_PAIN_ROOT_BANK_NAME
-    'SET_PLAYER_PLAYER_TARGETTING
-    'SET_PLAYER_TEAM
-    'SET_PLAYERS_CAN_BE_IN_SEPARATE_CARS
-    'SET_PLAYERS_DROP_MONEY_IN_NETWORK_GAME
-    'SET_PLAYERSETTINGS_MODEL_VARIATIONS_CHOICE
-    Public Shared Sub SetMayOnlyEnterThisVehicle(Car As Vehicle, OnlyThisVehicle As Boolean)
-        Dim PlayerIndex = index()
-        If OnlyThisVehicle Then [Call]("SET_PLAYER_MAY_ONLY_ENTER_THIS_VEHICLE", PlayerIndex, Car) Else [Call]("SET_PLAYER_MAY_ONLY_ENTER_THIS_VEHICLE", PlayerIndex, 0)
-    End Sub
-    Public Shared Sub SetMood(Mood As PlayerMoods)
-        NativePeds.Animations.Facials.Player.Request()
-        Dim MoodString As String
-        Select Case Mood
-            Case 0
-                [Call]("SET_PLAYER_MOOD_NORMAL", index)
-            Case 1
-                [Call]("SET_PLAYER_MOOD_NORMAL", index)
-                MoodString = "plyr_mood_happy"
-            Case 2
-                ' MoodString = "plyr_mood_angry"
-                [Call]("SET_PLAYER_MOOD_PISSED_OFF", index, 150000)
-            Case 3
-                [Call]("SET_PLAYER_MOOD_PISSED_OFF", index, 150000)
-                MoodString = "gest_angry_loop"
-            Case 4
-                [Call]("SET_PLAYER_MOOD_PISSED_OFF", index, 150000)
-                MoodString = "police_chase"
-            Case 5
-                [Call]("SET_PLAYER_MOOD_NORMAL", index)
-                MoodString = "gest_think_loop"
-            Case 6
-                [Call]("SET_PLAYER_MOOD_NORMAL", index)
-                MoodString = "gest_surprised_loop"
-            Case 7
-                [Call]("SET_PLAYER_MOOD_NORMAL", index)
-                MoodString = "chew"
-            Case 8
-                [Call]("SET_PLAYER_MOOD_NORMAL", index)
-                MoodString = "heavybreath"
-            Case 9
-                [Call]("SET_PLAYER_MOOD_NORMAL", index)
-                MoodString = "lookaround"
-            Case Else
-                [Call]("SET_PLAYER_MOOD_NORMAL", index)
-                MoodString = ""
-        End Select
-        If Mood <> 0 AndAlso Mood <> 2 AndAlso Mood <= 9 AndAlso Mood > 0 Then
-            'NativePeds.Animations.Facials.Play(getPlayerCharacter, MoodString, -1, True)
-            [Call]("TASK_PLAY_ANIM_FACIAL", Character, MoodString, "facials@m_hi", 1.0, 1, 0, -1)
-        End If
-    End Sub
-    Public Shared Sub SetPlayerControl(CanControlCharacter As Boolean, Optional CanControlCamera As Boolean = True)
-        [Call]("SET_PLAYER_CONTROL", index, CanControlCharacter)
-        [Call]("SET_CAMERA_CONTROLS_DISABLED_WITH_PLAYER_CONTROLS", Not CanControlCamera)
-    End Sub
-    Public Shared Sub SuppressFadeInAfterDeathArrest(Optional Enabled As Boolean = True)
-        [Call]("SUPPRESS_FADE_IN_AFTER_DEATH_ARREST", Enabled)
-    End Sub
     ''' <summary>
     ''' Returns current player's movement type checking current
     ''' "move_player" animation.
     ''' </summary>
     Public Shared Function GetMovementType() As MovementType
-        'If NativePeds.Animations.haveAnimsLoaded("move_player") Then NativePeds.Animations.Request("move_player")
+        'If NativePed.Animations.haveAnimsLoaded("move_player") Then NativePed.Animations.Request("move_player")
 
         If Character Is Nothing OrElse Not Character.Exists Then
             Return MovementType.Idle
@@ -397,7 +136,7 @@ Public Class NativePlayer
                     '   Return MoveType.Turning
                 End If
 
-                ' fallback generico
+                ' fallback
                 Return MovementType.Idle
             End If
         Next
@@ -405,127 +144,812 @@ Public Class NativePlayer
         ' Se nessuna animazione trovata, assumiamo Idle
         Return MovementType.Idle
     End Function
-    Private Shared Function IsPlayingAnim_MoveType(ped As Ped, animName As String) As Boolean
-        Return [Call](Of Boolean)("IS_CHAR_PLAYING_ANIM", ped, "move_player", animName)
+
+    Public Shared Function GetTrainPlayerWouldEnter() As NativeTrain
+        Dim pointer As Native.Pointer = New Native.Pointer(GetType(Vehicle))
+        [Call]("GET_TRAIN_PLAYER_WOULD_ENTER", Index, pointer)
+        If pointer.Value IsNot Nothing Then
+            Return pointer.Value
+        Else
+            Return Nothing
+        End If
     End Function
+
+    Public Shared Function HasCollectedPickup(Pickup As Pickup) As Boolean
+        Return [Call](Of Boolean)("HAS_PLAYER_COLLECTED_PICKUP", Index, Pickup)
+    End Function 'testare
+    Public Shared Function HasDamaged(Optional Peds As Boolean = True, Optional Vehicles As Boolean = True) As Boolean
+        If Peds AndAlso [Call](Of Boolean)("HAS_PLAYER_DAMAGED_AT_LEAST_ONE_PED") Then Return True
+        If Vehicles AndAlso [Call](Of Boolean)("HAS_PLAYER_DAMAGED_AT_LEAST_ONE_VEHICLE") Then Return True
+        Return False
+    End Function
+
+    Private Shared _cachedID As Integer = -1
+    Private Shared _cachedIndex As Integer = -1
+
+    Public Shared ReadOnly Property Index As Integer
+        Get
+            If _cachedID = -1 Then _cachedID = [Call](Of Integer)("GET_PLAYER_ID")
+            If _cachedIndex = -1 Then _cachedIndex = [Call](Of Integer)("CONVERT_INT_TO_PLAYERINDEX", _cachedID)
+            Return _cachedIndex
+        End Get
+    End Property
+
+    Public Shared WriteOnly Property IgnoredByPeds As Boolean
+        Set(value As Boolean)
+            [Call]("SET_EVERYONE_IGNORE_PLAYER", Index, value)
+        End Set
+    End Property
+
+    Public Shared WriteOnly Property IgnoredByPolice As Boolean
+        Set(value As Boolean)
+            [Call]("SET_POLICE_IGNORE_PLAYER", Index, value)
+        End Set
+    End Property
+
+    Public Shared ReadOnly Property IsPissedOff As Boolean
+        Get
+            Return [Call](Of Boolean)("PLAYER_IS_PISSED_OFF")
+        End Get
+    End Property
+    ''' <summary>
+    ''' Returns True while the game reports that the player is being arrested.
+    ''' The arrest may still be interrupted.
+    ''' </summary>
+    Public Shared ReadOnly Property IsBeginArrested As Boolean
+        Get
+            EnsureArrestMonitoring()
+            Return _IsBeingArrestedCached
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Returns True once the arrest state has confirmed (non-native).
+    ''' Remains True during the transition to respawn.
+    ''' </summary>
+    Public Shared ReadOnly Property IsArrestConfirmed As Boolean
+        Get
+            EnsureArrestMonitoring()
+            Return _IsArrestConfirmedCached
+        End Get
+    End Property
+    ''' <summary>
+    ''' Returns True if the player respawned after an arrest
+    ''' less than 10 seconds ago.
+    ''' </summary>
+    Public Shared ReadOnly Property IsRespawnedAfterArrest As Boolean
+        Get
+            Dim Elapsed As Integer = TimeSinceLastArrest
+
+            Return Elapsed >= 0 AndAlso Elapsed < RecentRespawnWindowMs
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Returns True if the player respawned after death
+    ''' less than 10 seconds ago.
+    ''' </summary>
+    Public Shared ReadOnly Property IsRespawnedAfterDeath As Boolean
+        Get
+            Dim Elapsed As Integer = TimeSinceLastDeath
+
+            Return Elapsed >= 0 AndAlso Elapsed < RecentRespawnWindowMs
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsClimbing As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_CLIMBING", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsDead As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_DEAD", Index)
+        End Get
+    End Property
+
+    Public Shared Function IsFreeAimingAtPed(Ped As Ped) As Boolean
+        Return [Call](Of Boolean)("IS_PLAYER_FREE_AIMING_AT_CHAR", Index, Ped)
+    End Function
+
+    Public Shared ReadOnly Property IsFreeForAmbientTask As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_FREE_FOR_AMBIENT_TASK", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsPerformingStoppie As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_PERFORMING_STOPPIE", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsPerformingWheelie As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_PERFORMING_WHEELIE", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsPlayingMinigame As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_MINIGAME_IN_PROGRESS")
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsPressingHorn As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_PRESSING_HORN", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsInInterior As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_INTERIOR_SCENE", Index)
+        End Get
+    End Property
+    Public Shared ReadOnly Property IsOnMission As Boolean
+        Get
+            Return [Call](Of Boolean)("GET_MISSION_FLAG")
+        End Get
+    End Property
+    Public Shared ReadOnly Property IsPlaying As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_PLAYING", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsReadyForCutscene As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_READY_FOR_CUTSCENE")
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsTargettingAnything As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_TARGETTING_ANYTHING", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsTargettingChar As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_TARGETTING_CHAR", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property IsTargettingObject As Boolean
+        Get
+            Return [Call](Of Boolean)("IS_PLAYER_TARGETTING_OBJECT", Index)
+        End Get
+    End Property
+
+    Public Shared WriteOnly Property KeepsWeaponsWhenRespawned As Boolean
+        Set(value As Boolean)
+            [Call]("SET_PLAYER_KEEPS_WEAPONS_WHEN_RESPAWNED", value)
+        End Set
+    End Property
+
+    Public Shared WriteOnly Property MaxArmour As Integer
+        Set(value As Integer)
+            [Call]("INCREASE_PLAYER_MAX_ARMOUR", Index, value)
+        End Set
+    End Property
+
+    Public Shared WriteOnly Property MaxHealth As Integer
+        Set(value As Integer)
+            [Call]("INCREASE_PLAYER_MAX_HEALTH", Index, value)
+        End Set
+    End Property
+    Public Shared Property Money As Integer
+        Get
+            [Call]("STORE_SCORE", NativePlayer.Index, pointerMoney)
+            Return pointerMoney.Value
+        End Get
+        Set(value As Integer)
+            Dim CurrMoney As Integer = Money
+            Dim Difference As Integer = value - CurrMoney
+            If Difference <> 0 Then
+                [Call]("ADD_SCORE", NativePlayer.Index, value)
+            End If
+        End Set
+    End Property
+
+
+    Public Shared WriteOnly Property NeverGetsTired As Boolean
+        Set(value As Boolean)
+            [Call]("SET_PLAYER_NEVER_GETS_TIRED", Index, value)
+        End Set
+    End Property
+
+    Public Shared ReadOnly Property NumberOfPedsKilled As Integer
+        Get
+            Return [Call](Of Integer)("GET_TOTAL_NUMBER_OF_PEDS_KILLED_BY_PLAYER", Index)
+        End Get
+    End Property
+
+    Public Shared Sub SetMayOnlyEnterThisVehicle(Car As Vehicle, Enable As Boolean)
+        Dim PlayerIndex = Index
+        If Enable Then [Call]("SET_PLAYER_MAY_ONLY_ENTER_THIS_VEHICLE", PlayerIndex, Car) Else [Call]("SET_PLAYER_MAY_ONLY_ENTER_THIS_VEHICLE", PlayerIndex, 0)
+    End Sub
+    ''' <summary>
+    ''' Sets player mood using facial anims and dedicated native function.
+    ''' </summary>
+    ''' <param name="Mood"></param>
+    ''' <param name="Duration">If -1</param>
+    Public Shared Sub SetMood(Mood As PlayerMoods, Optional PissedOff As Boolean? = Nothing, Optional Duration As Integer = -1)
+        NativePed.Animation.Facial.Player.Request()
+        Dim MoodString As String = ""
+        Dim MoodDuration As Integer
+        If Duration = -1 Then MoodDuration = 150000 'same value as SCO scripts
+        If Duration > 0 Then MoodDuration = Duration / 1000
+        Select Case Mood
+            Case 0
+                [Call]("SET_PLAYER_MOOD_NORMAL", Index)
+                If PissedOff.HasValue AndAlso PissedOff.Value = True Then
+                    Tools.WriteLog("Info for NativePlayer.SetMood: PissedOff = True is not valid for 'Normal' mood.")
+                End If
+                If Duration > 0 Then
+                    Tools.WriteLog("Info for NativePlayer.SetMood: duration cannot be set for 'Normal' mood.")
+                End If
+            Case 1
+                [Call]("SET_PLAYER_MOOD_NORMAL", Index)
+                MoodString = "plyr_mood_happy"
+            Case 2
+                'MoodString = "plyr_angry_loop"
+                [Call]("SET_PLAYER_MOOD_PISSED_OFF", Index, MoodDuration)
+            Case 3
+                [Call]("SET_PLAYER_MOOD_PISSED_OFF", Index, MoodDuration)
+                MoodString = "gest_angry_loop"
+            Case 4
+                [Call]("SET_PLAYER_MOOD_PISSED_OFF", Index, MoodDuration)
+                MoodString = "police_chase"
+            Case 5
+                [Call]("SET_PLAYER_MOOD_NORMAL", Index)
+                MoodString = "gest_think_loop"
+            Case 6
+                [Call]("SET_PLAYER_MOOD_NORMAL", Index)
+                MoodString = "gest_surprised_loop"
+            Case 7
+                [Call]("SET_PLAYER_MOOD_NORMAL", Index)
+                MoodString = "chew"
+            Case 8
+                [Call]("SET_PLAYER_MOOD_NORMAL", Index)
+                MoodString = "heavybreath"
+            Case 9
+                [Call]("SET_PLAYER_MOOD_NORMAL", Index)
+                MoodString = "lookaround"
+            Case Else
+                [Call]("SET_PLAYER_MOOD_NORMAL", Index)
+                MoodString = ""
+        End Select
+        If Mood <> 0 AndAlso Mood <> 2 AndAlso Mood <= 9 AndAlso Mood > 0 Then
+            'NativePed.Animations.Facials.Play(getPlayerCharacter, MoodString, -1, True)
+            [Call]("TASK_PLAY_ANIM_FACIAL", Character, MoodString, "facials@m_hi", 1.0, 1, 0, Duration)
+        End If
+    End Sub
+    ''' <summary>
+    ''' CanControlCamera seems not working sometimes.
+    ''' </summary>
+    ''' <param name="CanControlCamera"></param>
+    Public Shared Sub SetControl(CanControlCharacter As Boolean, Optional CanControlCamera As Boolean = True)
+        [Call]("SET_PLAYER_CONTROL", Index, CanControlCharacter)
+        [Call]("SET_CAMERA_CONTROLS_DISABLED_WITH_PLAYER_CONTROLS", Not CanControlCamera)
+    End Sub
+    ''' <summary>
+    ''' Untested.
+    ''' </summary>
+    Public Shared WriteOnly Property SuppressFadeInAfterDeathArrest As Boolean
+        Set(value As Boolean)
+            [Call]("SUPPRESS_FADE_IN_AFTER_DEATH_ARREST", value)
+        End Set
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceLastArrest As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_LAST_ARREST", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceLastDeath As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_LAST_DEATH", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceDroveAgainstTraffic As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_DROVE_AGAINST_TRAFFIC", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceDroveOnPavement As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_DROVE_ON_PAVEMENT", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceRanLight As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_RAN_LIGHT", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceHitBuilding As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_HIT_BUILDING", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceHitPed As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_HIT_PED", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceHitObject As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_HIT_OBJECT", Index)
+        End Get
+    End Property
+
+    Public Shared ReadOnly Property TimeSinceHitVehicle As Integer
+        Get
+            Return [Call](Of Integer)("GET_TIME_SINCE_PLAYER_HIT_VEHICLE", Index)
+        End Get
+    End Property
+
+    'IS_PLAYER_IN_POSITION_FOR_CONVERSATION
+    'IS_PLAYER_IN_REMOTE_MODE
+    'IS_PLAYER_IN_SHORTCUT_TAXI
+    'IS_PLAYER_LOGGING_IN_NP
+    'IS_PLAYER_SCRIPT_CONTROL_ON
+    'IS_PLAYER_SIGNED_IN_LOCALLY
+    'PLAYER_WANTS_TO_JOIN_NETWORK_GAME
+    'REGISTER_PLAYER_RESPAWN_COORDS
+    'SET_HAS_BEEN_OWNED_BY_PLAYER
+    'SET_PLAYER_CAN_BE_HASSLED_BY_GANGS
+    'SET_PLAYER_CAN_DROP_WEAPONS_IN_CAR
+    'SET_PLAYER_COLOUR
+    'SET_PLAYER_CONTROL
+    'SET_PLAYER_CONTROL_ADVANCED
+    'SET_PLAYER_CONTROL_FOR_AMBIENT_SCRIPT
+    'SET_PLAYER_CONTROL_FOR_NETWORK
+    'SET_PLAYER_CONTROL_FOR_TEXT_CHAT
+    'SET_PLAYER_CONTROL_ON_IN_MISSION_CLEANUP
+    'SET_PLAYER_GROUP_RECRUITMENT
+    'SET_PLAYER_GROUP_TO_FOLLOW_ALWAYS
+    'SET_PLAYER_GROUP_TO_FOLLOW_NEVER
+    'SET_PLAYER_ICON_COLOUR
+    'SET_PLAYER_INVINCIBLE
+    'SET_PLAYER_INVISIBLE_TO_AI
+    'SET_PLAYER_IS_IN_STADIUM
+    'SET_PLAYER_PLAYER_TARGETTING
+    'SET_PLAYER_TEAM
+    'SET_PLAYERS_CAN_BE_IN_SEPARATE_CARS
+    'SET_PLAYERS_DROP_MONEY_IN_NETWORK_GAME
+    'SET_PLAYERSETTINGS_MODEL_VARIATIONS_CHOICE
     Public Enum MovementType
         Idle = 0
         Walk = 2
         Run = 3
         Sprint = 4
     End Enum
-    Private Structure MoveAnims
-        Public Const run_turn_180_l As String = "run_turn_180_l"
-        Public Const walk_turn_180_r As String = "walk_turn_180_r"
-        Public Const run_down As String = "run_down"
-        Public Const sprint As String = "sprint"
-        Public Const run As String = "run"
-        Public Const walk_turn_r As String = "walk_turn_r"
-        Public Const run_start_fwd As String = "runstart_fwd"
-        Public Const walk_start_turn_l90 As String = "wstart_turn_l90"
-        Public Const run_strafe_l As String = "run_strafe_l"
-        Public Const run_turn_180_r As String = "run_turn_180_r"
-        Public Const run_start_l_90 As String = "runstart_l_90"
-        Public Const walk_start_turn_r180 As String = "wstart_turn_r180"
-        Public Const sprint_turn_r As String = "sprint_turn_r"
-        Public Const run_start_r_180 As String = "runstart_r_180"
-        Public Const walk_down As String = "walk_down"
-        Public Const run_stop_r As String = "rstop_r"
-        Public Const walk_stop_r As String = "wstop_r"
-        Public Const run_turn_r As String = "run_turn_r"
-        Public Const walk_strafe_l As String = "walk_strafe_l"
-        Public Const walk_up As String = "walk_up"
-        Public Const run_up As String = "run_up"
-        Public Const sprint_turn_l As String = "sprint_turn_l"
-        Public Const idle As String = "idle"
-        Public Const run_turn_180 As String = "run_turn_180"
-        Public Const walk_turn_l As String = "walk_turn_l"
-        Public Const turn_360_r As String = "turn_360_r"
-        Public Const walk As String = "walk"
-        Public Const run_start_r_90 As String = "runstart_r_90"
-        Public Const sprint_turn_180_l As String = "sprint_turn_180_l"
-        Public Const sprint_turn_180_r As String = "sprint_turn_180_r"
-        Public Const sprint_stop_l As String = "sstop_l"
-        Public Const walk_strafe_b As String = "walk_strafe_b"
-        Public Const walk_b As String = "walk_b"
-        Public Const walk_start_turn_r90 As String = "wstart_turn_r90"
-        Public Const run_start_l_180 As String = "runstart_l_180"
-        Public Const walk_turn_l3 As String = "walk_turn_l3"
-        Public Const walk_turn_180_l As String = "walk_turn_180_l"
-        Public Const walk_start As String = "wstart"
-        Public Const walk_stop_l As String = "wstop_l"
-        Public Const run_strafe_r As String = "run_strafe_r"
-        Public Const turn_360_l As String = "turn_360_l"
-        Public Const walk_turn_r2 As String = "walk_turn_r2"
-        Public Const walk_c As String = "walk_c"
-        Public Const run_turn_l2 As String = "run_turn_l2"
-        Public Const run_turn_l As String = "run_turn_l"
-        Public Const walk_turn_r3 As String = "walk_turn_r3"
-        Public Const walk_turn_l2 As String = "walk_turn_l2"
-        Public Const run_stop_l As String = "rstop_l"
-        Public Const run_strafe_b As String = "run_strafe_b"
-        Public Const walk_start_turn_l180 As String = "wstart_turn_l180"
-        Public Const run_turn_r2 As String = "run_turn_r2"
-        Public Const walk_strafe_r As String = "walk_strafe_r"
-        Public Const sprint_stop_r As String = "sstop_r"
-    End Structure
-    Public Class Stats
-        Public Shared Function CanHaveString(StatID As StatFloats) As Boolean
+
+    Public NotInheritable Class Phone
+        Private Sub New()
+        End Sub
+        Private Shared pointerPhoneRenderID As New Native.Pointer(GetType(Integer))
+        Private Shared ReadOnly Property CanUseCamera As Boolean
+            Get
+                If Not IsPhoneEnabled() Then Return False
+
+                Select Case State
+                    Case PhoneState.Idle, PhoneState.Menu
+                        Return True
+                    Case Else
+                        Return False
+                End Select
+            End Get
+        End Property
+        ''' <summary>
+        ''' Gets or sets whether the mobile phone system is enabled.
+        ''' Disabling the phone stops its native SCO scripts.
+        ''' </summary>
+        Public Shared Property Enabled As Boolean
+            Get
+                Return IsPhoneEnabled()
+            End Get
+
+            Set(value As Boolean)
+                If value = IsPhoneEnabled() Then Return
+
+                'Enabling
+                If value Then
+                    NativeScript.Start(IVScripts.SpCellphone)
+                    Return
+                End If
+
+                '-------------
+                'Disabling 
+                If NativeScript.IsRunning(IVScripts.SpCellphoneNetwork) Then
+                    NativeScript.Stop(IVScripts.SpCellphoneNetwork)
+                    [Call]("DESTROY_MOBILE_PHONE")
+                    Return
+                End If
+
+                Dim destroyphone As Boolean = False
+                Dim clearTasks As Boolean = False
+
+                NativeScript.Stop(IVScripts.SpCellphone)
+
+                If NativeScript.IsRunning(IVScripts.SpCellphoneCalling) Then
+                    NativeScript.Stop(IVScripts.SpCellphoneCalling)
+                    destroyphone = True
+                    clearTasks = True
+                End If
+
+                If NativeScript.IsRunning(IVScripts.SpCellphoneEndCall) Then
+                    NativeScript.Stop(IVScripts.SpCellphoneEndCall)
+                    destroyphone = True
+                    clearTasks = True
+                End If
+
+                If NativeScript.IsRunning(IVScripts.SpCellphoneMain) Then
+                    NativeScript.Stop(IVScripts.SpCellphoneMain)
+                    destroyphone = True
+                End If
+
+                If NativeScript.IsRunning(IVScripts.SpCellphoneDebug) Then
+                    NativeScript.Stop(IVScripts.SpCellphoneDebug)
+                End If
+
+                If destroyphone Then [Call]("DESTROY_MOBILE_PHONE")
+
+                If clearTasks Then NativePed.Task.ClearAll(NativePlayer.Character, True)
+            End Set
+        End Property
+        ''' <summary>
+        ''' Forces phone close terminating many native SCO scripts.
+        ''' </summary>
+        Public Shared Sub ForceClose()
+            Dim clearTasks As Boolean = False
+            Dim destroyphone As Boolean = False
+
+            If NativeScript.IsRunning(IVScripts.SpCellphoneCalling) Then
+                NativeScript.Stop(IVScripts.SpCellphoneCalling)
+                destroyphone = True
+                clearTasks = True
+            End If
+
+            If NativeScript.IsRunning(IVScripts.SpCellphoneEndCall) Then
+                NativeScript.Stop(IVScripts.SpCellphoneEndCall)
+                destroyphone = True
+                clearTasks = True
+            End If
+
+            If NativeScript.IsRunning(IVScripts.SpCellphoneMain) Then
+                NativeScript.Stop(IVScripts.SpCellphoneMain)
+                destroyphone = True
+            End If
+
+            If NativeScript.IsRunning(IVScripts.SpCellphoneNetwork) Then
+                NativeScript.Stop(IVScripts.SpCellphoneNetwork)
+            End If
+
+            If destroyphone Then [Call]("DESTROY_MOBILE_PHONE")
+            If clearTasks Then NativePed.Task.ClearAll(NativePlayer.Character, True)
+        End Sub
+        ''' <summary>
+        ''' Checks if player's mobile phone UI is currently visible on screen.
+        ''' </summary>
+        Public Shared ReadOnly Property IsOnScreen As Boolean
+            Get
+                ' --- Single Player
+                If NativeScript.IsRunning(IVScripts.SpCellphoneCalling) Then Return True
+                If NativeScript.IsRunning(IVScripts.SpCellphoneMain) Then Return True
+                If NativeScript.IsRunning(IVScripts.SpCellphoneNetwork) Then Return True
+                Return False
+            End Get
+        End Property
+
+        Public Shared WriteOnly Property MessagesWaiting As Boolean
+            Set(value As Boolean)
+                [Call]("SET_MESSAGES_WAITING", value)
+            End Set
+        End Property
+        ''' <summary>
+        ''' Seems returning always 1. Uses GET_MOBILE_PHONE_RENDER_ID native.
+        ''' </summary>
+        Public Shared ReadOnly Property RenderID As Integer
+            Get
+                [Call]("GET_MOBILE_PHONE_RENDER_ID", pointerPhoneRenderID)
+                Return pointerPhoneRenderID.Value
+            End Get
+        End Property
+
+        Public Shared Sub RemoveHudItem()
+            [Call]("SET_PHONE_HUD_ITEM", 0, "", -1)
+        End Sub
+
+        Public Shared Sub SetHudItem(Icon As PhoneHudItem, NumberInFrontOfString As Integer, Optional GXT_Text As String = "")
+            [Call]("SET_PHONE_HUD_ITEM", CInt(Icon), GXT_Text, NumberInFrontOfString)
+        End Sub
+
+        Public Shared WriteOnly Property SleepMode As Boolean
+            Set(value As Boolean)
+                [Call]("SET_SLEEP_MODE_ACTIVE", value)
+            End Set
+        End Property
+
+        Public Shared Sub StartCall()
+            [Call]("START_MOBILE_PHONE_CALLING")
+        End Sub
+
+        Public Shared Sub StartRinging(Optional RingtoneID As Ringtones = Ringtones.Standard)
+            [Call]("START_CUSTOM_MOBILE_PHONE_RINGING", CInt(RingtoneID))
+        End Sub
+
+        Public Shared Sub StopRinging()
+            [Call]("STOP_MOBILE_PHONE_RINGING")
+        End Sub
+        ''' <summary>
+        ''' Returns phone states regarding to SCO script currently running.
+        ''' </summary>
+        Public Shared ReadOnly Property State As PhoneState
+            Get
+                'in ordine di priorità
+                'Manager
+                If Not NativeScript.IsRunning(IVScripts.SpCellphone) Then Return PhoneState.Disabled
+
+                'Fine chiamata
+                If NativeScript.IsRunning(IVScripts.SpCellphoneEndCall) Then Return PhoneState.EndCall
+
+                'Chiamata
+                If NativeScript.IsRunning(IVScripts.SpCellphoneCalling) Then
+                    If [Call](Of Boolean)("IS_MOBILE_PHONE_CALL_ONGOING") Then
+                        Return PhoneState.CallOnGoing
+                    Else
+                        Return PhoneState.Calling
+                    End If
+                End If
+
+                'Menu
+                If NativeScript.IsRunning(IVScripts.SpCellphoneMain) Then Return PhoneState.Menu
+
+                'In tasca
+                Return PhoneState.Idle
+
+                'Telefono iniziale
+                If NativeScript.IsRunning(IVScripts.SpCellphoneNetwork) Then Return PhoneState.InitialPhone
+            End Get
+        End Property
+
+        Public Enum PhoneHudItem
+            TextMessage = 1
+            NewContact = 2
+            AppointmentRing = 3
+            NewAppointment = 4
+            MissionReplay = 5
+            PhotoSent = 6
+            PhoneDisabled = 7
+            RespectGained = 8
+            RespectLost = 9
+            InviteReceived = 10
+        End Enum
+        ''' <summary>
+        ''' All phone states regarding to SCO script running.
+        ''' </summary>
+        Public Enum PhoneState
+            Disabled = -2
+            InitialPhone = -1
+            Idle = 0
+            Menu = 1
+            Calling = 2
+            CallOnGoing = 3
+            EndCall = 4
+        End Enum
+        ''' <summary>
+        ''' All available phone ringtones.
+        ''' </summary>
+        Public Enum Ringtones
+            Standard = 0
+            Ringing1 = 1
+            Ringing2 = 2
+            Countryside = 3
+            Fox = 4
+            HighSeas = 5
+            Malfunction = 6
+            Pager = 7
+            Spy = 8
+            Teeker = 9
+            Text = 10
+            CoolRoom = 11
+            KatjasWaltz = 12
+            Laidback = 13
+            Solo = 14
+            SwingIt = 15
+            _109 = 16
+            Bassmatic = 17
+            CreditCheck = 18
+            Drive = 19
+            FunkInTime = 20
+            GetDown = 21
+            IntoSomething = 22
+            MineUntilMonday = 23
+            TakeThePain = 24
+            TheOneForMe = 25
+            Tonight = 26
+            Beheading = 27
+            Champagne = 28
+            Diamonds = 29
+            FlatLine = 30
+            Hooker = 31
+            Jet = 32
+            Lesbians = 33
+            MoneyCounter = 34
+            OldBitch = 35
+            StThomas = 37
+            DragonBrain = 60
+            ScienceOfCrime = 61
+        End Enum
+        ''' <summary>
+        ''' Not fully tested.
+        ''' </summary>
+        Public NotInheritable Class Camera
+            Private Sub New() : End Sub
+            ''' <param name="Unknown">First parameter of CELL_CAM_ACTIVATE native. If nothing, it will be set the "Activate" value.</param>
+            ''' <param name="IgnorePhoneState">Camera will be activated even if mobile phone is disabled or in any call state (non native).</param>
+            Public Shared Sub Activate(Activate As Boolean, Optional Unknown As Boolean? = Nothing, Optional IgnorePhoneState As Boolean = False)
+                If Not IgnorePhoneState AndAlso Not EnsureCameraAvailable() Then Return
+                Dim flag As Boolean = If(Unknown.HasValue, Unknown.Value, Activate)
+                [Call]("CELL_CAM_ACTIVATE", flag, Activate)
+            End Sub
+
+            Public Shared WriteOnly Property CenterPosition As Vector2
+                Set(value As Vector2)
+                    If Not EnsureCameraAvailable() Then Return
+                    [Call]("CELL_CAM_SET_CENTRE_POS", CSng(value.X), CSng(value.Y))
+                End Set
+            End Property
+            ''' <summary>
+            ''' Untested. Uses CELL_CAM_SET_COLOUR_BRIGHTNESS (not found in SCO scripts).
+            ''' </summary>
+            Public Shared WriteOnly Property ColourBrightness As Single
+                Set(value As Single)
+                    [Call]("CELL_CAM_SET_COLOUR_BRIGHTNESS", CSng(value))
+                End Set
+            End Property
+
+            Public Shared Function IsPedVisible(Ped As Ped, Optional FaceCheck As Boolean = False) As Boolean
+                If Not EnsureCameraAvailable() Then Return False
+                If Not Ped.Exists Then Return False
+
+                If FaceCheck Then
+                    Return [Call](Of Boolean)("CELL_CAM_IS_CHAR_VISIBLE", Ped)
+                Else
+                    Return [Call](Of Boolean)("CELL_CAM_IS_CHAR_VISIBLE_NO_FACE_CHECK", Ped)
+                End If
+            End Function
+
+            Public Shared WriteOnly Property Zoom As Single
+                Set(value As Single)
+                    If Not EnsureCameraAvailable() Then Return
+                    [Call]("CELL_CAM_SET_ZOOM", CSng(value))
+                End Set
+            End Property
+        End Class
+        '===========================================================================================================
+        Private Shared Function IsPhoneEnabled() As Boolean
+            If NativeScript.IsRunning("spcellphonenetwork") Then
+                Return True
+            End If
+
+            If NativeScript.IsRunning("spcellphone") OrElse
+           NativeScript.IsRunning("spcellphonecalling") OrElse
+           NativeScript.IsRunning("spcellphonecall") OrElse
+           NativeScript.IsRunning("spcellphoneendcall") OrElse
+           NativeScript.IsRunning("spcellphonemain") OrElse
+           NativeScript.IsRunning("spcellphonedebug") Then
+                Return True
+            End If
+
+            Return False
+        End Function
+        Private Shared Function EnsureCameraAvailable() As Boolean
+            If Not CanUseCamera Then
+                Tools.WriteLog("NativePhone.Camera: phone is disabled or not running.")
+                Return False
+            End If
+            Return True
+        End Function
+        'public public shared Sub CreateMobilePhone()
+        '    [Call]("CREATE_MOBILE_PHONE", 2)
+        'End Sub 'testare parametri aggiuntivi
+        'Public Shared Sub AddLineToMobilePhoneCall(p1 As Integer, p2 As Integer, p3 As Integer) 'p2 and p3 unknown
+        '    [Call]("ADD_LINE_TO_MOBILE_PHONE_CALL", p1, p2, p3)
+        'End Sub
+
+        'CHANGE_PLAYER_PHONE_MODEL (player index, integer --> model phone) Testato, non funziona?
+    End Class
+
+    Public NotInheritable Class Stats
+        Private Sub New()
+        End Sub
+
+        Public Shared Function CanHaveString(StatID As Integer) As Boolean
             Return [Call](Of Boolean)("CAN_THE_STAT_HAVE_STRING", StatID)
         End Function
-        Public Shared Function CanHaveString(StatID As StatINTs) As Boolean
-            Return [Call](Of Boolean)("CAN_THE_STAT_HAVE_STRING", StatID)
-        End Function
+
         Public Shared Sub DecrementInt(StatID As StatINTs, DecrementValue As Integer)
             [Call]("DECREMENT_INT_STAT", StatID, DecrementValue)
         End Sub
+
         Public Shared Sub DecrementFloat(StatID As StatFloats, DecrementValue As Single)
             [Call]("DECREMENT_FLOAT_STAT", StatID, DecrementValue)
         End Sub
+
         Public Shared Function GetInt(StatID As StatINTs) As Integer
-            Return [Call](Of Integer)("GET_FLOAT_STAT", StatID)
+            Return [Call](Of Integer)("GET_INT_STAT", StatID)
         End Function
+
         Public Shared Function GetFloat(StatID As StatFloats) As Single
             Return [Call](Of Single)("GET_FLOAT_STAT", StatID)
         End Function
-        Public Shared Function GetFrontedFloatDisplayType(StatID As StatFloats) As Integer
+        ''' <summary>
+        ''' Returns stat display type inside stats menu.
+        ''' </summary>
+        Public Shared Function GetDisplayType(StatID As Integer) As StatDisplay
             Return [Call](Of Integer)("GET_STAT_FRONTEND_DISPLAY_TYPE", StatID)
         End Function
-        Public Shared Function GetFrontedIntDisplayType(StatID As StatINTs) As Integer
-            Return [Call](Of Integer)("GET_STAT_FRONTEND_DISPLAY_TYPE", StatID)
-        End Function
-        Public Shared Function GetFrontedFloatVisibility(StatID As StatFloats) As Boolean
+
+        ''' <summary>
+        ''' Returns stat visibility inside stats menu.
+        ''' </summary>
+        Public Shared Function GetVisibility(StatID As Integer) As Boolean
             Return [Call](Of Boolean)("GET_STAT_FRONTEND_VISIBILITY", StatID)
         End Function
-        Public Shared Function GetFrontedIntVisibility(StatID As StatINTs) As Boolean
-            Return [Call](Of Boolean)("GET_STAT_FRONTEND_VISIBILITY", StatID)
+
+        Public Shared Function GetProgressPercentage() As Single
+            Return [Call](Of Single)("GET_PROGRESS_PERCENTAGE")
         End Function
+
         Public Shared Sub IncrementInt(StatID As StatINTs, IncrementValue As Integer, Optional NoMessage As Boolean = False)
             If NoMessage Then [Call]("INCREMENT_INT_STAT_NO_MESSAGE", StatID, IncrementValue) Else [Call]("INCREMENT_INT_STAT", StatID, IncrementValue)
         End Sub
+
         Public Shared Sub IncrementFloat(StatID As StatFloats, IncrementValue As Single, Optional NoMessage As Boolean = False)
             If NoMessage Then [Call]("INCREMENT_FLOAT_STAT_NO_MESSAGE", StatID, IncrementValue) Else [Call]("INCREMENT_FLOAT_STAT", StatID, IncrementValue)
         End Sub
+
         Public Shared Sub SetInt(StatID As StatINTs, NewValue As Integer, Optional Register As Boolean = False)
             [Call]("SET_INT_STAT", StatID, NewValue)
             If Register Then [Call]("REGISTER_INT_STAT", StatID, NewValue)
         End Sub
+
         Public Shared Sub SetFloat(StatID As StatFloats, NewValue As Single, Optional Register As Boolean = False)
             [Call]("SET_FLOAT_STAT", StatID, NewValue)
             If Register Then [Call]("REGISTER_FLOAT_STAT", StatID, NewValue)
         End Sub
-        Public Shared Sub SetFrontedFloatDisplayType(StatID As StatFloats, DisplayType As Integer)
+        ''' <summary>
+        ''' Sets display type inside Stats menu.
+        ''' </summary>
+        Public Shared Sub SetDisplayType(StatID As Integer, DisplayType As StatDisplay)
             [Call]("SET_STAT_FRONTEND_DISPLAY_TYPE", StatID, DisplayType)
         End Sub
-        Public Shared Sub SetFrontedIntDisplayType(StatID As StatINTs, DisplayType As Integer)
-            [Call]("SET_STAT_FRONTEND_DISPLAY_TYPE", StatID, DisplayType)
-        End Sub
-        Public Shared Sub SetFrontedFloatVisibility(StatID As StatFloats, Visible As Boolean)
+        ''' <summary>
+        ''' Sets visibility inside Stats menu.
+        ''' </summary>
+        Public Shared Sub SetVisibility(StatID As Integer, Visible As Boolean, Optional ForceAlways As Boolean = False)
             [Call]("SET_STAT_FRONTEND_VISIBILITY", StatID, Visible)
+            If ForceAlways Then
+                If Visible Then
+                    [Call]("SET_STAT_FRONTEND_ALWAYS_VISIBLE", StatID)
+                Else
+                    [Call]("SET_STAT_FRONTEND_NEVER_VISIBLE", StatID)
+                End If
+            End If
         End Sub
-        Public Shared Sub SetFrontedIntVisibility(StatID As StatINTs, Visible As Boolean)
-            [Call]("SET_STAT_FRONTEND_VISIBILITY", StatID, Visible)
-        End Sub
+
         Public Enum StatFloats
             'from 0 to 120 (IV), from 121 to 246 EFLC, from 247 to 252 empty
             IV_GameProgress = 0
@@ -787,6 +1211,7 @@ Public Class NativePlayer
             IVEFLC_Empty14 = 251
             IVEFLC_Empty15 = 252
         End Enum
+
         Public Enum StatINTs
             IV_MissionsPassed = 253
             IV_MissionsFailed = 254
@@ -1046,10 +1471,199 @@ Public Class NativePlayer
             IVEFLC_Empty15 = 498
             IVEFLC_Empty16 = 499
         End Enum
-        'SET_STAT_FRONTEND_ALWAYS_VISIBLE
-        'SET_STAT_FRONTEND_NEVER_VISIBLE
-        'SET_STAT_FRONTEND_VISIBLE_AFTER_INCREMENTED
-        'REGISTER_STRING_FOR_FRONTEND_STAT
-        'SHOW_UPDATE_STATS
+
+        Public Enum StatDisplay
+            [Integer] = 0
+            Float = 1
+            Percent = 2
+            Money = 3
+            Integer_WithRightSpacing = 4
+            Weight = 5
+            ''' <summary>
+            ''' No measure unit (maybe raw speed value)
+            ''' </summary>
+            Speed = 6
+            ''' <summary>
+            ''' Maybe miles.
+            ''' </summary>
+            Distance = 7
+            TimeMs = 9
+            StringValue = 11
+            SpeedMph = 12
+            ''' <summary>
+            ''' Seems not working in IV, untested EFLC.
+            ''' </summary>
+            BoolCheckbox = 14
+        End Enum
     End Class
+
+#Region "Internals"
+    Private Shared Function IsPlayingAnim_MoveType(ped As Ped, animName As String) As Boolean
+        Try
+            If ped IsNot Nothing AndAlso ped.Exists Then
+                Return [Call](Of Boolean)("IS_CHAR_PLAYING_ANIM", ped, "move_player", animName)
+            Else
+                Tools.WriteLog("Error in NativePlayer.IsPlayingAnim_MoveType: cannot find character.")
+                Return False
+            End If
+        Catch ex As Exception
+            Tools.WriteLog("Error in NativePlayer.IsPlayingAnim_MoveType.", ex)
+            Return False
+        End Try
+    End Function
+
+    Private Structure MoveAnims
+        Public Const run_turn_180_l As String = "run_turn_180_l"
+        Public Const walk_turn_180_r As String = "walk_turn_180_r"
+        Public Const run_down As String = "run_down"
+        Public Const sprint As String = "sprint"
+        Public Const run As String = "run"
+        Public Const walk_turn_r As String = "walk_turn_r"
+        Public Const run_start_fwd As String = "runstart_fwd"
+        Public Const walk_start_turn_l90 As String = "wstart_turn_l90"
+        Public Const run_strafe_l As String = "run_strafe_l"
+        Public Const run_turn_180_r As String = "run_turn_180_r"
+        Public Const run_start_l_90 As String = "runstart_l_90"
+        Public Const walk_start_turn_r180 As String = "wstart_turn_r180"
+        Public Const sprint_turn_r As String = "sprint_turn_r"
+        Public Const run_start_r_180 As String = "runstart_r_180"
+        Public Const walk_down As String = "walk_down"
+        Public Const run_stop_r As String = "rstop_r"
+        Public Const walk_stop_r As String = "wstop_r"
+        Public Const run_turn_r As String = "run_turn_r"
+        Public Const walk_strafe_l As String = "walk_strafe_l"
+        Public Const walk_up As String = "walk_up"
+        Public Const run_up As String = "run_up"
+        Public Const sprint_turn_l As String = "sprint_turn_l"
+        Public Const idle As String = "idle"
+        Public Const run_turn_180 As String = "run_turn_180"
+        Public Const walk_turn_l As String = "walk_turn_l"
+        Public Const turn_360_r As String = "turn_360_r"
+        Public Const walk As String = "walk"
+        Public Const run_start_r_90 As String = "runstart_r_90"
+        Public Const sprint_turn_180_l As String = "sprint_turn_180_l"
+        Public Const sprint_turn_180_r As String = "sprint_turn_180_r"
+        Public Const sprint_stop_l As String = "sstop_l"
+        Public Const walk_strafe_b As String = "walk_strafe_b"
+        Public Const walk_b As String = "walk_b"
+        Public Const walk_start_turn_r90 As String = "wstart_turn_r90"
+        Public Const run_start_l_180 As String = "runstart_l_180"
+        Public Const walk_turn_l3 As String = "walk_turn_l3"
+        Public Const walk_turn_180_l As String = "walk_turn_180_l"
+        Public Const walk_start As String = "wstart"
+        Public Const walk_stop_l As String = "wstop_l"
+        Public Const run_strafe_r As String = "run_strafe_r"
+        Public Const turn_360_l As String = "turn_360_l"
+        Public Const walk_turn_r2 As String = "walk_turn_r2"
+        Public Const walk_c As String = "walk_c"
+        Public Const run_turn_l2 As String = "run_turn_l2"
+        Public Const run_turn_l As String = "run_turn_l"
+        Public Const walk_turn_r3 As String = "walk_turn_r3"
+        Public Const walk_turn_l2 As String = "walk_turn_l2"
+        Public Const run_stop_l As String = "rstop_l"
+        Public Const run_strafe_b As String = "run_strafe_b"
+        Public Const walk_start_turn_l180 As String = "wstart_turn_l180"
+        Public Const run_turn_r2 As String = "run_turn_r2"
+        Public Const walk_strafe_r As String = "walk_strafe_r"
+        Public Const sprint_stop_r As String = "sstop_r"
+    End Structure
+    '==========================================================================================================================================
+    Private Const ArrestConfirmationDelayMs As Long = 3000L
+    Private Const RecentRespawnWindowMs As Integer = 10000
+
+    Private Shared ReadOnly ArrestMonitoringTick As Action = AddressOf UpdateArrestMonitoring
+
+    Private Shared _IsBeingArrestedCached As Boolean = False
+    Private Shared _IsArrestConfirmedCached As Boolean = False
+    Private Shared _ArrestStartedAtGameTime As Long = 0
+    Private Shared Sub EnsureArrestMonitoring()
+
+        If Not TickHelper.ContainsHandler_Internal(ArrestMonitoringTick) Then
+            TickHelper.Add_Internal(ArrestMonitoringTick)
+        End If
+
+        ' Aggiorna subito lo stato, senza attendere il tick successivo.
+        UpdateArrestMonitoring()
+
+    End Sub
+    Private Shared Sub UpdateArrestMonitoring()
+
+        If NativePlayer.IsDead Then
+            _IsBeingArrestedCached = False
+            _IsArrestConfirmedCached = False
+            _ArrestStartedAtGameTime = 0
+            Return
+        End If
+
+        Dim CurrentlyBeingArrested As Boolean =
+            [Call](Of Boolean)("IS_PLAYER_BEING_ARRESTED")
+
+        Dim CurrentGameTime As Long =
+            CLng(NativeTimer.TotalGameTime)
+
+        If CurrentlyBeingArrested Then
+
+            If Not _IsBeingArrestedCached Then
+
+                ' Inizio di un nuovo tentativo di arresto.
+                _ArrestStartedAtGameTime = CurrentGameTime
+                _IsArrestConfirmedCached = False
+
+            ElseIf Not _IsArrestConfirmedCached Then
+
+                Dim Elapsed As Long =
+                    GetElapsedGameMilliseconds(
+                        _ArrestStartedAtGameTime,
+                        CurrentGameTime)
+
+                If Elapsed >= ArrestConfirmationDelayMs Then
+                    _IsArrestConfirmedCached = True
+                End If
+
+            End If
+
+            _IsBeingArrestedCached = True
+
+        Else
+
+            _IsBeingArrestedCached = False
+
+            If _IsArrestConfirmedCached Then
+
+                ' Conserva la conferma durante la transizione
+                ' dall'arresto al respawn.
+                If NativePlayer.IsRespawnedAfterArrest Then
+                    _IsArrestConfirmedCached = False
+                    _ArrestStartedAtGameTime = 0
+                End If
+
+            Else
+
+                ' L'arresto non è stato confermato:
+                ' il giocatore potrebbe essere riuscito a fuggire.
+                _ArrestStartedAtGameTime = 0
+
+            End If
+
+        End If
+
+    End Sub
+    Private Shared Function GetElapsedGameMilliseconds(
+    StartTime As Long,
+    CurrentTime As Long) As Long
+
+        Dim Elapsed As Long = CurrentTime - StartTime
+
+        If Elapsed < 0 Then
+            Elapsed += 4294967296L
+        ElseIf Elapsed > Integer.MaxValue Then
+            Elapsed -= 4294967296L
+        End If
+
+        Return Elapsed
+
+    End Function
+    '==========================================================================================================================================
+#End Region
+
 End Class

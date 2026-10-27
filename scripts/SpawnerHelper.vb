@@ -2,7 +2,7 @@
 Imports System.Threading
 Imports GTA
 Imports GTA.Native.Function
-Imports NativeExtended.NativePeds.Clothes
+Imports NativeExtended.NativePed.Clothes
 Public NotInheritable Class SpawnerHelper
     Private Class SpawnRequest
         Public Property ModelName As String
@@ -24,9 +24,9 @@ Public NotInheritable Class SpawnerHelper
     Public Shared Sub ProcessPendingRequests()
         For Each req In _pendingRequests.ToList()
             If Not req.Requested Then
-                [Call]("REQUEST_MODEL", NativeModels.getHashKey(req.ModelName))
+                [Call]("REQUEST_MODEL", NativeModel.getHashKey(req.ModelName))
                 req.Requested = True
-            ElseIf [Call](Of Boolean)("HAS_MODEL_LOADED", NativeModels.getHashKey(req.ModelName)) Then
+            ElseIf [Call](Of Boolean)("HAS_MODEL_LOADED", NativeModel.getHashKey(req.ModelName)) Then
                 Dim spawnedObj As Object = Nothing
                 Select Case req.ModelType
                     Case SpawnType.Vehicle

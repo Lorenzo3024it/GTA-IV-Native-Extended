@@ -53,11 +53,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Vehicle Gauges\DLL da installare\ScriptHookDotNet.dll</HintPath>
     </Reference>
-    <Reference Include="SlimDX">
-      <HintPath>..\Vehicle Gauges\DLL da installare\SlimDX.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
@@ -77,18 +75,24 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="scripts\Checkpoint.vb" />
+    <Compile Include="scripts\Core.vb" />
+    <Compile Include="scripts\Helicopter.vb" />
+    <Compile Include="scripts\Menu_API_Parts.vb" />
     <Compile Include="scripts\Debug.vb" />
-    <Compile Include="scripts\Entity.vb" />
-    <Compile Include="scripts\Explosions.vb" />
+    <None Include="scripts\Entity.vb" />
+    <Compile Include="scripts\Explosion.vb" />
     <Compile Include="scripts\Fire.vb" />
     <Compile Include="scripts\Garage.vb" />
+    <Compile Include="scripts\Menu_Internal.vb" />
+    <Compile Include="scripts\Menu_API_Main.vb" />
     <Compile Include="scripts\Models.vb" />
-    <Compile Include="scripts\Scripts.vb" />
-    <Compile Include="scripts\PaynSpray.vb" />
     <None Include="scripts\SpawnerHelper.vb" />
+    <Compile Include="scripts\Scripts.vb" />
     <Compile Include="scripts\TickHelper.vb" />
     <Compile Include="scripts\Timer.vb" />
     <Compile Include="scripts\Tools.vb" />
+    <Compile Include="scripts\Viewport.vb" />
     <Compile Include="scripts\World.vb" />
     <None Include="scripts\z. Unused.vb" />
     <Compile Include="My Project\1.vb" />
@@ -116,14 +120,13 @@
     <Compile Include="scripts\Hud.vb" />
     <Compile Include="scripts\Controls.vb" />
     <Compile Include="scripts\Objects.vb" />
-    <Compile Include="scripts\Peds.vb" />
-    <Compile Include="scripts\Phone.vb" />
+    <Compile Include="scripts\Ped.vb" />
     <Compile Include="scripts\Player.vb" />
     <Compile Include="scripts\Police.vb" />
     <Compile Include="scripts\PTFX.vb" />
     <Compile Include="scripts\Radio.vb" />
     <Compile Include="scripts\Trains.vb" />
-    <Compile Include="scripts\Vehicles.vb" />
+    <Compile Include="scripts\Vehicle.vb" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="My Project\Resources.resx">

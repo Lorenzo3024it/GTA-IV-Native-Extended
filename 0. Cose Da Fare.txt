@@ -1,0 +1,11 @@
+- Native Menu:
+	-Info menu;
+	-Fix separator Y position
+	-Menu appearance editor
+	-menu keys editing (+ settings file)
+	-log custom
+- Settings File
+
+- Progress Bar
+
+- 

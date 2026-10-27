@@ -1,7 +1,8 @@
-﻿Imports GTA
+﻿Imports System.Windows.Forms
+Imports GTA
 Imports GTA.Native.Function
 
-Public Class NativeObjects
+Public Class NativeObject
     Public Shared Sub AddToInteriorRoom(Obj As GTA.Object, InteriorID As Integer)
         [Call]("ADD_OBJECT_TO_INTERIOR_ROOM_BY_KEY", Obj, InteriorID)
     End Sub
@@ -16,13 +17,13 @@ Public Class NativeObjects
             [Call]("ANCHOR_OBJECT", Obj, Anchor, Unknown)
         End If
     End Sub
-    Public Shared Sub AttachObjectToCar(Obj As GTA.Object, Car As Vehicle, Position As Vector3, Rotation As Vector3, Optional Unknown As Integer = 0)
+    Public Shared Sub AttachToCar(Obj As GTA.Object, Car As Vehicle, Position As Vector3, Rotation As Vector3, Optional Unknown As Integer = 0)
         [Call]("ATTACH_OBJECT_TO_CAR", Obj, Car, Unknown, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z)
     End Sub
     'Public Shared Sub AttachObjectToCarPhisically()
     '    [Call]("ATTACH_OBJECT_TO_CAR_PHYSICALLY")
     'End Sub
-    Public Shared Sub AttachObjectToPed(Obj As GTA.Object, Ped As Ped, BoneID As Bone, Position As Vector3, Rotation As Vector3, Optional Unknown As Integer = 0)
+    Public Shared Sub AttachToPed(Obj As GTA.Object, Ped As Ped, BoneID As Bone, Position As Vector3, Rotation As Vector3, Optional Unknown As Integer = 0)
         [Call]("ATTACH_OBJECT_TO_PED", Obj, Ped, BoneID, Position.X, Position.Y, Position.Z, Rotation.X, Rotation.Y, Rotation.Z, Unknown)
     End Sub
     'Public Shared Sub AttachObjectToPedPhisically()
@@ -85,16 +86,16 @@ Public Class NativeObjects
     Public Shared Function HasPhysics(Obj As GTA.Object) As Boolean
         Return [Call](Of Boolean)("DOES_OBJECT_HAVE_PHYSICS", Obj)
     End Function
-    Public Shared Function isObjectAttached(Obj As GTA.Object) As Boolean
+    Public Shared Function IsAttached(Obj As GTA.Object) As Boolean
         Return [Call](Of Boolean)("IS_OBJECT_ATTACHED")
     End Function
-    Public Shared Function isInWater(Obj As GTA.Object) As Boolean
+    Public Shared Function IsInWater(Obj As GTA.Object) As Boolean
         Return [Call](Of Boolean)("IS_OBJECT_IN_WATER", Obj)
     End Function
-    Public Shared Function isTouchingObject(Obj1 As GTA.Object, Obj2 As GTA.Object) As Boolean
+    Public Shared Function IsTouchingObject(Obj1 As GTA.Object, Obj2 As GTA.Object) As Boolean
         Return [Call](Of Boolean)("IS_OBJECT_TOUCHING_OBJECT", Obj1, Obj2)
     End Function
-    Public Shared Function isOnScreen(Obj As GTA.Object) As Boolean
+    Public Shared Function IsOnScreen(Obj As GTA.Object) As Boolean
         Return [Call](Of Boolean)("IS_OBJECT_ON_SCREEN", Obj)
     End Function
     Public Shared Sub SetAlpha(Obj As GTA.Object, Alpha_0_to_255 As Integer)
@@ -113,14 +114,14 @@ Public Class NativeObjects
         [Call]("SET_OBJECT_RECORDS_COLLISIONS", Obj, RecordsCollisions)
     End Sub
     'Public Shared Function SpawnObject(Model As String, Position As Vector3, Collisions As Boolean, Optional RecordsCollisions As Boolean = False, Optional MsgText As String = "") As GTA.Object
-    '    [Call]("REQUEST_MODEL", NativeModels.getHashKey(Model))
+    '    [Call]("REQUEST_MODEL", NativeModel.getHashKey(Model))
     '    'Do
     '    '    Game.WaitInCurrentScript(1)
     '    '    If MsgText <> "" Then
     '    '        NativeDraws.DisplayText(MsgText, 1000)
     '    '    End If
     '    'Loop Until [Call](Of Boolean)("HAS_MODEL_LOADED", ModelID)
-    '    Dim SpawnedObject = World.CreateObject(NativeModels.getHashKey(Model), Position)
+    '    Dim SpawnedObject = World.CreateObject(NativeModel.getHashKey(Model), Position)
     '    ' [Call]("SET_OBJECT_COLLISION", SpawnedObject, Collisions)
     '    '  If RecordsCollisions Then [Call]("SET_OBJECT_RECORDS_COLLISIONS", SpawnedObject, True)
     '    Return SpawnedObject

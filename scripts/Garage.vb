@@ -13,7 +13,7 @@ Public Class NativeGarage
     Private Shared _allGarages As List(Of NativeGarage)
     Private _type As Flags = Flags.LockedInPosition
     Private _pos As GTA.Vector3
-    Private _dont_Affect_camera As Boolean = True
+    Private _dontAffectCamera As Boolean = True
     Private _targetcar As Vehicle = Nothing
     Private _name As String
     Private Shared _lastToggleKeydown As Single = 0
@@ -49,61 +49,66 @@ Public Class NativeGarage
             Return _radius
         End Get
     End Property
-    Public Property isOwnedByPlayer As Boolean
-        Get
-            Return _ownedByPlayer
-        End Get
-        Set(value As Boolean)
-            _ownedByPlayer = value
-        End Set
-    End Property
+    'Public Property IsOwnedByPlayer As Boolean
+    '    Get
+    '        Return _ownedByPlayer
+    '    End Get
+    '    Set(value As Boolean)
+    '        _ownedByPlayer = value
+    '    End Set
+    'End Property
     Public Property TargetVehicle As Vehicle
         Get
             Return _targetcar
         End Get
         Set(value As Vehicle)
-            [Call]("SET_TARGET_CAR_FOR_MISSION_GARAGE", Hash, TargetVehicle)
             _targetcar = value
+            If value IsNot Nothing AndAlso value.Exists Then
+                [Call]("SET_TARGET_CAR_FOR_MISSION_GARAGE", Hash, value)
+            End If
         End Set
     End Property
-    Public Shared Property Tick As Boolean
+    Friend Shared Property Tick As Boolean
         Get
             Return _isTickEnabled
         End Get
         Set(value As Boolean)
-            If value = True Then
-                If Not TickHelper.ContainsHandler_Internal(_tickHandler) Then TickHelper.Add_Internal(_tickHandler)
+            If value = _isTickEnabled Then Return
+
+            _isTickEnabled = value
+            If value Then
+                If Not TickHelper.ContainsHandler_Internal(_tickHandler) Then
+                    TickHelper.Add_Internal(_tickHandler)
+                End If
             Else
-                If TickHelper.ContainsHandler_Internal(_tickHandler) Then TickHelper.Remove_Internal(_tickHandler)
+                If TickHelper.ContainsHandler_Internal(_tickHandler) Then
+                    TickHelper.Remove_Internal(_tickHandler)
+                End If
             End If
         End Set
     End Property
-    Public ReadOnly Property isOpen As Boolean
+    Public ReadOnly Property IsOpen As Boolean
         Get
             Return [Call](Of Boolean)("IS_GARAGE_OPEN", Hash)
         End Get
     End Property
-    Public ReadOnly Property isClosed As Boolean
+    Public ReadOnly Property IsClosed As Boolean
         Get
             Return [Call](Of Boolean)("IS_GARAGE_CLOSED", Hash)
         End Get
     End Property
-    Public ReadOnly Property isMoving As Boolean
+    Public ReadOnly Property IsMoving As Boolean
         Get
-            If Not isClosed AndAlso Not isOpen Then
-                Return True
-            Else
-                Return False
-            End If
+            Return Not isClosed AndAlso Not isOpen
         End Get
     End Property
     Public Property DontAffectCamera As Boolean
         Get
-            Return _dont_Affect_camera
+            Return _dontAffectCamera
         End Get
         Set(value As Boolean)
             [Call]("SET_GARAGE_LEAVE_CAMERA_ALONE", Hash, value)
-            _dont_Affect_camera = value
+            _dontAffectCamera = value
         End Set
     End Property
     Public Property Behaviour As Flags
@@ -125,7 +130,7 @@ Public Class NativeGarage
     End Property
 
     Public Shared Broker As NativeGarage = New NativeGarage("bs3MG")
-    Public Shared Bohan As NativeGarage = New NativeGarage("BxGRG1") 'Bohan
+    Public Shared Bohan As NativeGarage = New NativeGarage("BxGRG1")
     Public Shared Unknown01 As NativeGarage = New NativeGarage("PegGar")
     Public Shared EastIsland As NativeGarage = New NativeGarage("QW2MG1")
     Public Shared JimmyUnknown As NativeGarage = New NativeGarage("QW2MG2")
@@ -204,21 +209,18 @@ Public Class NativeGarage
             [Call]("CLOSE_GARAGE", Hash)
         End If
     End Sub
-    'Public Sub ChangeType(GarageType As  NativeGarage.GarageType)
-    '    [Call]("CHANGE_GARAGE_TYPE", StringName,  NativeGarageType)
-    'End Sub
-    Public Function isVehicleInside(Car As Vehicle)
+    Public Function IsVehicleInside(Car As Vehicle)
         Return [Call](Of Boolean)("IS_CAR_IN_GARAGE_AREA", Hash, Car)
         'NativePTFX.
     End Function
-    Public Function isPlayerInside() As Boolean
+    Public Function IsPlayerInside() As Boolean
         If NativePlayer.Character.Position.DistanceTo(Position) < _radius Then
             Return True
         Else
             Return False
         End If
     End Function
-    Public Shared Function getClosestGarage(Position As Vector3) As NativeGarage
+    Public Shared Function GetClosestGarage(Position As Vector3) As NativeGarage
         If List.Count = 0 Then Return Nothing
 
         Dim closestGarage As NativeGarage = Nothing
@@ -236,10 +238,10 @@ Public Class NativeGarage
 
         Return closestGarage
     End Function
-    Public Shared Function isPlayerInsideAnyGarage() As Boolean
-        Return [Call](Of Boolean)("PLAYER_IS_INTERACTING_WITH_GARAGE", nativeplayer.index)
+    Public Shared Function IsPlayerInsideAnyGarage() As Boolean
+        Return [Call](Of Boolean)("PLAYER_IS_INTERACTING_WITH_GARAGE", NativePlayer.Index)
     End Function
-    Public Function isInRange(Pos As Vector3, Optional Range As Single = 20.0F) As Boolean
+    Public Function IsInRange(Pos As Vector3, Optional Range As Single = 20.0F) As Boolean
         If Pos.DistanceTo(Position) <= Range Then
             Return True
         Else
@@ -277,25 +279,6 @@ Public Class NativeGarage
             Open(Flags.ClosesWhenDistant)
         End If
     End Sub
-    Private Sub OLDToggleVladGarageDoor()
-        If NativeGarage.Broker.isInRange(NativePlayer.Character.Position, 15.0F) AndAlso Broker.CanBeManuallyOpened Then
-            If NativeGarage.Broker.isOpen Then
-                Dim v As Vehicle = World.GetClosestVehicle(NativeGarage.Broker.Position, 10.0F)
-                If v.Exists Then
-                    If NativeGarage.Broker.isVehicleInside(World.GetClosestVehicle(NativeGarage.Broker.Position, 10.0F)) Then
-                        NativeGarage.Broker.Close(NativeGarage.Flags.ManualControl)
-                    Else
-                        NativeGarage.Broker.Close(NativeGarage.Flags.ClosesWhenDistant)
-                    End If
-                Else
-                    NativeGarage.Broker.Close(NativeGarage.Flags.ClosesWhenDistant)
-                End If
-            ElseIf NativeGarage.Broker.isClosed Then
-
-                NativeGarage.Broker.Open()
-            End If
-        End If
-    End Sub
     Public Shared Sub ToggleNearestGarageDoor(Optional Range As Single = 15.0F, Optional overrideCanBeOpenedManually As Boolean = False)
         Try
             Dim player As Ped = NativePlayer.Character
@@ -328,9 +311,6 @@ Public Class NativeGarage
 
         End Try
     End Sub
-    Private Function getAllGarages() As List(Of NativeGarage)
-        Return New List(Of NativeGarage)(List)
-    End Function
     '    Private Shared ReadOnly GarageDefinitions As New Dictionary(Of String, (Vector3, String)) From {
     '    {"BS3MG", (New Vector3(964.96, -329, 19.43), "Broker Garage")},
     '    {"BXGRG1", (Vector3.Zero, "Bohan Garage")},
@@ -341,14 +321,14 @@ Public Class NativeGarage
     '    {"QW2MG1", (New Vector3(917.2, 570.43, 22.28), "East Island Garage")},
     '    {"LOCKUP5", (Vector3.Zero, "Unknown TBoGT")}
     '}
-    Public Shared Function isVehicleInAnyGarage(Car As Vehicle) As Boolean
+    Public Shared Function IsVehicleInAnyGarage(Car As Vehicle) As Boolean
         Try
             If Car Is Nothing OrElse Not Car.Exists Then Return False
             If List Is Nothing OrElse List.Count = 0 Then Return False
 
             For Each g As NativeGarage In List
                 If g IsNot Nothing AndAlso g.Hash IsNot Nothing Then
-                    If g.isVehicleInside(Car) Then
+                    If g.IsVehicleInside(Car) Then
                         Return True
                     End If
                 End If
@@ -388,23 +368,60 @@ Public Class NativeGarage
             End If
         End If
     End Sub
-    Private Class Tick_OLD
-        Private Shared _tickHandler As Action = AddressOf UpdateGarageControl_OnTick
-        Public Sub New(handler As Action)
-            _tickHandler = handler
+
+
+    Public NotInheritable Class PaynSpray
+        Private Sub New()
         End Sub
-        ''' <summary>
-        ''' Enables the Tick adding it to the TickHelper. You must call TickHelper.ProcessAll
-        ''' in a Tick inside main script to process them.
-        ''' </summary>
-        Public Shared Sub Enable()
-            TickHelper.Add_Internal(_tickHandler)
+        Public Shared Sub AllowCarToBeResprayed(Car As Vehicle, Optional Allow As Boolean = True)
+            [Call]("SET_CAN_RESPRAY_CAR", Car, Allow)
         End Sub
-        ''' <summary>
-        ''' Disables the Tick removing it from the TickHelper.
-        ''' </summary>
-        Public Shared Sub Disable()
-            TickHelper.Remove_Internal(_tickHandler)
-        End Sub
+
+        Public Shared WriteOnly Property Enabled As Boolean
+            Set(value As Boolean)
+                [Call]("SET_NO_RESPRAYS", Not value)
+            End Set
+        End Property
+
+        Public Shared WriteOnly Property FreeResprays As Boolean
+            Set(value As Boolean)
+                [Call]("SET_FREE_RESPRAYS", value)
+            End Set
+        End Property
+
+        Public Shared ReadOnly Property IsAnyPaynSprayActive As Boolean
+            Get
+                Return [Call](Of Boolean)("IS_PAY_N_SPRAY_ACTIVE")
+            End Get
+        End Property
+
+        Public Shared Function HasCarBeenResprayed(Car As Vehicle) As Boolean
+            Return [Call](Of Boolean)("HAS_CAR_BEEN_RESPRAYED", Car)
+        End Function
+
+        Public Shared ReadOnly Property IsResprayHappened As Boolean
+            Get
+                Return [Call](Of Boolean)("HAS_RESPRAY_HAPPENED")
+            End Get
+        End Property
     End Class
+    'Private Class Tick_OLD
+    '    Private Shared _tickHandler As Action = AddressOf UpdateGarageControl_OnTick
+    '    Public Sub New(handler As Action)
+    '        _tickHandler = handler
+    '    End Sub
+    '    ''' <summary>
+    '    ''' Enables the Tick adding it to the TickHelper. You must call TickHelper.ProcessAll
+    '    ''' in a Tick inside main script to process them.
+    '    ''' </summary>
+    '    Public Shared Sub Enable()
+    '        TickHelper.Add_Internal(_tickHandler)
+    '    End Sub
+    '    ''' <summary>
+    '    ''' Disables the Tick removing it from the TickHelper.
+    '    ''' </summary>
+    '    Public Shared Sub Disable()
+    '        TickHelper.Remove_Internal(_tickHandler)
+    '    End Sub
+    'End Class
 End Class

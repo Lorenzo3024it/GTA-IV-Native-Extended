@@ -1,271 +1,817 @@
-﻿Imports GTA
+﻿Imports System.Net.Security
+Imports System.Runtime.InteropServices
+Imports System.Windows.Forms
+Imports System.Xml.Schema
+Imports GTA
 Imports GTA.Native.Function
+Imports NativeExtended.NativeDraws.GXT
+Imports NativeExtended.NativeDraws.TextStyle
 Imports NativeExtended.Tools
-
-Public Class NativeDraws
-    '--------------------------------------------------------------------------------------------------------
-    'Brief / News Scrollbar
-    '-----------------------
-    Public Shared Sub AddTextToBrief(Text As String, Optional Underscore As Boolean = False)
-        If Underscore = False Then [Call]("ADD_TO_PREVIOUS_BRIEF", Text) Else [Call]("ADD_TO_PREVIOUS_BRIEF_WITH_UNDERSCORE", Text)
+Public NotInheritable Class NativeDraws
+    Private Sub New()
     End Sub
-    Public Shared Sub AddTextToNewsScrollbar(Text As String)
-        [Call]("ADD_STRING_TO_NEWS_SCROLLBAR", Text)
-    End Sub
-    Public Shared Sub ClearBrief()
-        [Call]("CLEAR_BRIEF")
-    End Sub
-    Public Shared Sub ClearNewsScrollbar()
-        [Call]("CLEAR_NEWS_SCROLLBAR")
-    End Sub
-    '--------------------------------------------------------------------------------------------------------
+    Private Shared HelpTextStyle As New TextStyle(Color:=ColorRGBA.White, Size:=21, Justification:=NativeDraws.Justification.Left,
+                                           BorderColor:=ColorRGBA.Black, Font:=Fonts.Standard, Shadow:=False, WidthScale:=0.8606F)
+    Private Shared HelpTextPosition As New Vector2(0.054, 0.055)
+    Private Shared HelpTextWrap As (Length As Single, LineHeightMultiplier As Single) = (Length:=0.202, LineHeightMultiplier:=1.0)
+    Private Const HelpTextBoxLeft As Single = 0.05F
+    Private Const BackgroundHorizontalPadding As Single = 0.006F
+    Private Const BackgroundVerticalPadding As Single = 0.005F
+    Private Const HelpTextRightPadding As Single = 0.02F
+    Private Shared _lockSettingStyle As New Object
+    ''' <summary>All native justifications for texts.</summary>
+    Public Enum Justification
+        Left = 0
+        Center = 1
+        ''' <summary>Needs a wrap to work properly.</summary>
+        Right = 2
+        ''' <summary>Needs a wrap to work properly.</summary>
+        Justify = 3
+    End Enum
+    ''' <summary> Native values. There are also values between 4 and 7, which changes position Y. All of them are natively independent.</summary>
+    Public Enum BigPrintType
+        Center_GtaNumbers = 1
+        ''' <summary>
+        ''' Hides car name, street and zone.
+        ''' </summary>
+        BottomRight_Narrow = 2
+        Center_Standard = 3
+    End Enum
+    Public Enum QueueMode
+        DisplayNow = 0
+        AddToQueue = 1
+        IgnoreIfBusy = 2
+    End Enum
+    '======================================================================================================================================================================
     'Custom Texts
     '-------------
     ''' <summary>
-    ''' Display a custom message (bottom-center of screen, like a subtitle).
+    ''' Clears every custom PrintBigText currently displayed or queued, optionally clearing
+    ''' native one too (type 1 to 3).
     ''' </summary>
+    Public Shared Sub ClearAllBigPrints(Optional ClearNative As Boolean = False)
+        DrawManager.ClearAllBigPrintTexts()
+        If ClearNative Then
+            Dim i As Integer
+            For i = 1 To 3
+                [Call]("PRINT_BIG", "STRING", 1, i)
+            Next
+        End If
+    End Sub
+    ''' <summary>
+    ''' Clears the custom PrintBigText associated with the specified type,
+    ''' including all queued messages of that type. Optionally clears the
+    ''' corresponding native slot.
+    ''' </summary>
+    ''' <param name="Type">The BigPrintType to clear.</param>
+    Public Shared Sub ClearBigPrint(Type As BigPrintType, Optional ClearNative As Boolean = False)
+        DrawManager.ClearBigPrintText(Type)
+        If ClearNative Then GXT.ClearBigPrint(Type)
+    End Sub
+    ''' <summary>
+    ''' Clears all custom helps in queue, optionally clearing native one too.
+    ''' </summary>
+    ''' <param name="ClearNative">If true will call GXT.HelpMessage.Clear</param>
+    Public Shared Sub ClearHelp(Optional ClearNative As Boolean = False)
+        DrawManager.ClearHelpRequests()
+        If ClearNative Then GXT.ClearHelp()
+    End Sub
+    ''' <summary>
+    ''' Draws a 2D debug grid with center displayed on bottom of screen.
+    ''' You can move with arrows (Left Shift to increase precision).
+    ''' </summary>
+    Public Shared Property DrawDebugGrid As Boolean
+        Get
+            Return _drawDebugGrid
+        End Get
+        Set(value As Boolean)
+            If _drawDebugGrid = value Then Return
+
+            _drawDebugGrid = value
+            If value Then
+                StartDebugGrid()
+            Else
+                StopDebugGrid()
+            End If
+        End Set
+    End Property
+    ''' <summary>
+    ''' Display a custom message (bottom-center of screen, like a subtitle).
+    '''</summary>
     ''' <param name="BriefDisplay">If False the message won't be added to Briefing</param>
     ''' <param name="DisplayNow">If False the message will be added to a queue and displayed only if there aren't other messages on screen</param>
-    ''' <param name="UnknownFlag">Set 1 by default (True). Not sure about this, I always used 1</param>
-    Public Shared Sub DisplayText(Text As String, Optional Duration As Integer = 3000, Optional BriefDisplay As Boolean = False,
-                                  Optional DisplayNow As Boolean = True, Optional UnknownFlag As Boolean = True)
-        Dim flag As Integer
-        If UnknownFlag Then flag = 1 Else flag = 0
+    Public Shared Sub DisplayText(Text As String, Optional Duration As Integer = 4000, Optional BriefDisplay As Boolean = False, Optional DisplayNow As Boolean = True)
+        Dim UnknownFlag As Integer = 1
         If Duration < 5 Then Duration = 5
         [Call]("ADD_NEXT_MESSAGE_TO_PREVIOUS_BRIEFS", BriefDisplay)
         If DisplayNow Then
-            [Call]("PRINT_STRING_WITH_LITERAL_STRING_NOW", "STRING", Text, Duration, flag)
+            [Call]("PRINT_STRING_WITH_LITERAL_STRING_NOW", "STRING", Text, Duration, UnknownFlag)
         Else
-            [Call]("PRINT_STRING_WITH_LITERAL_STRING", "STRING", Text, Duration, flag)
+            [Call]("PRINT_STRING_WITH_LITERAL_STRING", "STRING", Text, Duration, UnknownFlag)
         End If
     End Sub
+    '======================================================================================================================================================================
     ''' <summary>
-    ''' Display a text with custom style and position on screen.
-    ''' You must call TickHelper.ProcessAll in a Tick to set the display duration.
-    ''' Otherwise you can set Duration = 1 and call directly in you main Tick.
-    '''</summary>
-    Public Shared Sub DisplayTextAdvanced(Text As String, Optional Duration As Integer = 3000, Optional PositionPercent As Vector2 = Nothing, Optional Style As TextStyle = Nothing)
-        Dim FinalStyle As TextStyle
-        If Style = Nothing Then
-            FinalStyle = TextStyle.Default
-        Else
-            FinalStyle = Style
-        End If
-        If PositionPercent = Nothing Then PositionPercent = New Vector2(0.0, 0.0)
-        If Duration < 5 Then
-            TextStyle.SetTextStyle(FinalStyle)
-            [Call]("DISPLAY_TEXT_WITH_LITERAL_STRING", PositionPercent.X, PositionPercent.Y, "STRING", Text)
-        Else
-            DrawManager.DisplayTextAdvanced(Text, Duration, PositionPercent, FinalStyle)
-        End If
-    End Sub
-    '-----------------------------------------------------------------------------------------------------------------------------------------------------------------
-    ''' <summary>
-    ''' Untested
-    '''</summary>
-    Public Shared Sub DrawCylinder(Coordinates As GTA.Vector3, Unknown01 As Single, Unknown02 As Single, Color As ColorRGBA)
-        [Call]("DRAW_COLOURED_CYLINDER", Coordinates.X, Coordinates.Y, Coordinates.Z, Unknown01, Unknown02, Color.Red, Color.Green, Color.Blue, Color.Alpha)
-    End Sub
-    ''' <summary>
-    '''Draws a checkpoint. Must be use in a tick (cycle)
-    '''</summary>
-    Public Shared Sub DrawCheckpoint(Coordinates As GTA.Vector3, Radius As Single, Color As ColorRGBA)
-        If Color.Alpha = 255 Then
-            [Call]("DRAW_CHECKPOINT", Coordinates.X, Coordinates.Y, Coordinates.Z, Radius, Color.Red, Color.Green, Color.Blue)
-        Else
-            [Call]("DRAW_CHECKPOINT_WITH_ALPHA", Coordinates.X, Coordinates.Y, Coordinates.Z, Radius, Color.Red, Color.Green, Color.Blue, Color.Alpha)
-        End If
-    End Sub
-    '-----------------------------------------------------------------------------------------------------------------------------------------------------------------
-    ''' <summary>
-    ''' Draws a curved window. You must call TickHelper.ProcessAll in a Tick to set the display duration.
-    ''' Otherwise you can set Duration = 1 and call directly in you main Tick.
-    '''</summary>
-    Public Shared Sub DrawCurvedWindow(PercentagePos As Vector2, PercentageSize As Vector2, Alpha As Byte, Optional Duration As Integer = 1)
-        If Duration < 5 Then
-            [Call]("DRAW_CURVED_WINDOW", PercentagePos.X, PercentagePos.Y, PercentageSize.X, PercentageSize.Y, CInt(Alpha))
-        Else
-            DrawCurvedWindow(PercentagePos, PercentageSize, Alpha, Duration)
-        End If
-    End Sub
-    ''' <summary>
-    ''' Draws a rectangle. You must call TickHelper.ProcessAll in a Tick to set the display duration.
-    ''' Otherwise you can set Duration = 1 and call directly in you main Tick.
-    '''</summary>
-    Public Shared Sub DrawRectangle(PercentagePos As Vector2, PercentageSize As Vector2, Color As ColorRGBA, Optional Duration As Integer = 1, Optional CenteredX As Boolean = True, Optional CenteredY As Boolean = True)
+    ''' Draws a line (horizontal or vertical) using DRAW_RECT.
+    ''' Optimized using the current aspect ratio.
+    ''' </summary>
+    ''' <param name="Position">Line position.</param>
+    ''' <param name="Length">Line length (from 0.0 to 1.0).</param>
+    ''' <param name="Thickness">Line thickness (suggested 0.002 -> 0.01).</param>
+    ''' <param name="Color">RGBA color.</param>
+    ''' <param name="Vertical">If True draws a vertical line, otherwise horizontal.</param>
+    ''' <param name="Center">If True the position is the center of the line, otherwise it is the start.</param>
+    ''' <param name="Duration">Draw duration (>=5 uses DrawManager).</param>
+    Public Shared Sub DrawLine(Position As Vector2, Length As Single, Optional Thickness As Single = 0.005F, Optional Color As ColorRGBA = Nothing,
+                               Optional Vertical As Boolean = False, Optional Center As Boolean = False, Optional Duration As Integer = 1)
 
-        Dim posX As Single = PercentagePos.X
-        Dim posY As Single = PercentagePos.Y
+        If Length <= 0.0F OrElse Thickness <= 0.0F Then Exit Sub
+
+        If Color = Nothing Then Color = ColorRGBA.White
+        Dim aspect As Single = Tools.ScreenAspectRatio ' [Call](Of Single)("GET_ASPECT_RATIO")
+
+        Dim sizeX As Single
+        Dim sizeY As Single
+        Dim centerX As Single = Position.X
+        Dim centerY As Single = Position.Y
+
+        If Vertical Then
+            sizeX = Thickness
+            sizeY = Length
+
+            If Not Center Then centerY += sizeY / 2.0F
+        Else
+            sizeX = Length
+            sizeY = Thickness * aspect
+
+            If Not Center Then centerX += sizeX / 2.0F
+        End If
+
+        If Duration < 5 Then
+            [Call]("DRAW_RECT", centerX, centerY, sizeX, sizeY, Color.Red, Color.Green, Color.Blue, Color.Alpha)
+        Else
+            DrawManager.DrawRect(New Vector2(centerX, centerY), New Vector2(sizeX, sizeY), Color, Duration)
+        End If
+    End Sub
+    ''' <summary>
+    ''' Draws a rectangle with optional borders.
+    ''' You must call TickHelper.ProcessAll in a Tick to set the display duration. Please note that this function calls 5 rectangles, so it could be heavy while drawing many elements.
+    ''' </summary>
+    ''' <param name="PercentagePos">Rectangle position.</param>
+    ''' <param name="PercentageSize">Rectangle size.</param>
+    ''' <param name="Color">Fill color.</param>
+    ''' <param name="Duration">Draw duration.</param>
+    ''' <param name="CenteredX">If True X position is centered.</param>
+    ''' <param name="CenteredY">If True Y position is centered.</param>
+    ''' <param name="BordersColor">Border color (defaults to black).</param>
+    ''' <param name="BordersThickness">Border thickness (0 = no borders; suggested values from 0.002 to 0.01).</param>
+    Public Shared Sub DrawRectangle(PercentagePos As Vector2, PercentageSize As Vector2, Color As ColorRGBA, Optional CenteredX As Boolean = True,
+                                    Optional CenteredY As Boolean = True, Optional Duration As Integer = 1,
+                                    Optional BordersThickness As Single = 0.0F, Optional BordersColor As ColorRGBA = Nothing)
+
+        If PercentageSize.X <= 0.0F OrElse PercentageSize.Y <= 0.0F Then Return
+
+        Dim centerX As Single = PercentagePos.X
+        Dim centerY As Single = PercentagePos.Y
+
         Dim sizeX As Single = PercentageSize.X
         Dim sizeY As Single = PercentageSize.Y
 
-        If CenteredX = False Then
-            posX = PercentagePos.X + (sizeX / 2.0F)
-        End If
-        If CenteredY = False Then
-            posY = PercentagePos.Y + (sizeY / 2.0F)
-        End If
+        If Not CenteredX Then centerX += sizeX / 2.0F
+        If Not CenteredY Then centerY += sizeY / 2.0F
 
         If Duration < 5 Then
-            [Call]("DRAW_RECT", posX, posY, sizeX, sizeY,
-               Color.Red, Color.Green, Color.Blue, Color.Alpha)
+            [Call]("DRAW_RECT", centerX, centerY, sizeX, sizeY, Color.Red, Color.Green, Color.Blue, Color.Alpha)
+
+            If BordersThickness > 0.0F Then
+                Dim aspect As Single = Tools.ScreenAspectRatio '[Call](Of Single)("GET_ASPECT_RATIO")
+                If BordersColor = Nothing Then BordersColor = ColorRGBA.Black
+                Dim thicknessX As Single = BordersThickness
+                Dim thicknessY As Single = BordersThickness * aspect
+
+                Dim halfX As Single = sizeX / 2.0F
+                Dim halfY As Single = sizeY / 2.0F
+
+                Dim halfThicknessX As Single = thicknessX / 2.0F
+                Dim halfThicknessY As Single = thicknessY / 2.0F
+
+                Dim horizontalWidth As Single = sizeX + thicknessX * 2
+                Dim horizontalCenterX As Single = centerX
+                Dim topCenterY As Single = centerY - halfY - halfThicknessY
+                Dim bottomCenterY As Single = centerY + halfY + halfThicknessY
+
+                [Call]("DRAW_RECT", horizontalCenterX, topCenterY, horizontalWidth, thicknessY, BordersColor.Red, BordersColor.Green, BordersColor.Blue, BordersColor.Alpha)
+                [Call]("DRAW_RECT", horizontalCenterX, bottomCenterY, horizontalWidth, thicknessY, BordersColor.Red, BordersColor.Green, BordersColor.Blue, BordersColor.Alpha)
+
+                Dim verticalHeight As Single = sizeY
+                Dim leftCenterX As Single = centerX - halfX - halfThicknessX
+                Dim rightCenterX As Single = centerX + halfX + halfThicknessX
+                Dim verticalCenterY As Single = centerY
+
+                [Call]("DRAW_RECT", leftCenterX, verticalCenterY, thicknessX, verticalHeight, BordersColor.Red, BordersColor.Green, BordersColor.Blue, BordersColor.Alpha)
+                [Call]("DRAW_RECT", rightCenterX, verticalCenterY, thicknessX, verticalHeight, BordersColor.Red, BordersColor.Green, BordersColor.Blue, BordersColor.Alpha)
+            End If
         Else
-            DrawManager.DrawRect(New Vector2(posX, posY), PercentageSize, Color, Duration)
+            DrawManager.DrawRect(New Vector2(centerX, centerY), PercentageSize, Color, Duration, BordersThickness, BordersColor)
         End If
     End Sub
+    ''' <summary>
+    ''' Draws a square with optional borders using "DRAW_RECT".
+    ''' The specified size represents the square height in screen percentage.
+    ''' The width is automatically adjusted using the current aspect ratio.
+    ''' You must call TickHelper.ProcessAll in a Tick to set the display duration.
+    ''' </summary>
+    ''' <param name="PercentagePos">Square position.</param>
+    ''' <param name="Size">Square size based on screen height.</param>
+    ''' <param name="Color">Fill color.</param>
+    ''' <param name="Duration">Draw duration.</param>
+    ''' <param name="CenteredX">If True X position is centered.</param>
+    ''' <param name="CenteredY">If True Y position is centered.</param>
+    ''' <param name="BordersColor">Border color (defaults to black).</param>
+    ''' <param name="BordersThickness">Border thickness (0 = no borders; suggested values from 0.002 to 0.01).</param>
+    Public Shared Sub DrawSquare(PercentagePos As Vector2, Size As Single, Color As ColorRGBA, Optional CenteredX As Boolean = True,
+                                 Optional CenteredY As Boolean = True, Optional Duration As Integer = 1, Optional BordersThickness As Single = 0.0F,
+                                 Optional BordersColor As ColorRGBA = Nothing)
 
+        If Size <= 0.0F Then Exit Sub
+        Dim aspect As Single = Tools.ScreenAspectRatio
+        If aspect <= 0.0F Then Return
+        Dim SquareSize As New Vector2(Size / aspect, Size)
+
+        DrawRectangle(PercentagePos, SquareSize, Color, Duration, CenteredX, CenteredY, BordersThickness, BordersColor)
+    End Sub
     ''' <summary>
     ''' Draws the game screen. You must call TickHelper.ProcessAll in a Tick to set the display duration.
     ''' Otherwise you can set Duration = 1 and call directly in you main Tick.
     '''</summary>
     Public Shared Sub DrawSpriteFrontBuff(PercentagePos As Vector2, PercentageSize As Vector2, RotationInDegrees As Single, Color As ColorRGBA, Optional Duration As Integer = 1)
-
         If Duration < 5 Then
             [Call]("DRAW_SPRITE_FRONT_BUFF", PercentagePos.X, PercentagePos.Y, PercentageSize.X, PercentageSize.Y, RotationInDegrees, Color.Red, Color.Green, Color.Blue, Color.Alpha)
         Else
             DrawManager.DrawFrontBuff(PercentagePos, PercentageSize, RotationInDegrees, Color, Duration)
         End If
     End Sub
-    '-----------------------------------------------------------------------------------------------------------------------------------------------------------------
-    'Lights and Coronas
-    '-------------------
+    '=========================================================================================================================================================================================
     ''' <summary>
-    '''Draws a corona fx. Must be use in a tick (cycle)
-    '''</summary>
-    Public Shared Sub DrawCorona(Position As GTA.Vector3, Radius As Single, Color As ColorRGB, Optional Intensity_0_To_100 As Integer = 10)
-        Dim R, G, B As Integer
-        R = Color.Red * (Intensity_0_To_100 / 100)
-        G = Color.Green * (Intensity_0_To_100 / 100)
-        B = Color.Blue * (Intensity_0_To_100 / 100)
-        [Call]("DRAW_CORONA", Position.X, Position.Y, Position.Z, Radius, 0, 0.0F, R, G, B)
-    End Sub
-    ''' <summary>
-    '''Draws a light with range. Must be use in a tick (cycle)
-    '''</summary>
-    Public Shared Sub DrawLight(Position As GTA.Vector3, Color As ColorRGB, Intensity As Single, Range As Single)
-        [Call]("DRAW_LIGHT_WITH_RANGE", Position.X, Position.Y, Position.Z, Color.Red, Color.Green, Color.Blue, Intensity, Range)
-    End Sub
-    ''' <summary>
-    ''' Two combined functions to easily draw a corona with proper light. Must be use in a tick (cycle)
-    '''</summary>
-    Public Shared Sub DrawLightWithCorona(Position As GTA.Vector3, Color As ColorRGB, LightIntensity As Single, LightRange As Single, CoronaRadius As Single, Optional CoronaIntensity_0_To_100 As Integer = 10)
-        Dim R, G, B As Integer
-        R = Color.Red * (CoronaIntensity_0_To_100 / 100)
-        G = Color.Green * (CoronaIntensity_0_To_100 / 100)
-        B = Color.Blue * (CoronaIntensity_0_To_100 / 100)
-        [Call]("DRAW_CORONA", Position.X, Position.Y, Position.Z, CoronaRadius, 0, 0.0F, R, G, B)
-        [Call](Of Integer)("DRAW_LIGHT_WITH_RANGE", Position.X, Position.Y, Position.Z, Color.Red, Color.Green, Color.Blue, LightIntensity, LightRange)
-    End Sub
+    ''' Draws text using a custom style and normalized screen position.
+    ''' Durations shorter than 5 milliseconds draw immediately.
+    ''' Longer durations are managed by DrawManager and require
+    ''' TickHelper.ProcessAll to be called from a Tick.
+    ''' Returns the measured text width and total line-box height.
+    ''' The returned height includes the line-height multiplier,
+    ''' but does not include the optional background padding.
+    ''' </summary>
+    ''' <param name="Text">The text to display.</param>
+    ''' <param name="Duration">Display duration in milliseconds.</param>
+    ''' <param name="PositionPercent">Normalized screen position.</param>
+    ''' <param name="Style">Optional text style.</param>
+    ''' <param name="Wrap">Optional wrapping length and line-height multiplier.</param>
+    ''' <param name="ViewportID">Optional native text viewport identifier.</param>
+    ''' <param name="RenderID">Optional native text render identifier.</param>
+    ''' <returns>
+    ''' A tuple containing Width and Height, in normalized screen coordinates.
+    ''' </returns>
+    Public Shared Function DrawText(Text As String, PositionPercent As Vector2, Optional Duration As Integer = 3000, Optional Style As TextStyle = Nothing,
+                                    Optional Wrap As (Length As Single?, LineHeightMultiplier As Single?) = Nothing, Optional ViewportID As Integer? = Nothing,
+                                    Optional RenderID As Integer? = Nothing) As (Width As Single, Height As Single, LineCount As Integer)
 
+        Dim FinalText As String = If(Text, String.Empty)
+        Dim FinalStyle As TextStyle
+        If Style Is Nothing Then FinalStyle = TextStyle.Default Else FinalStyle = Style
 
+        If PositionPercent = Nothing Then PositionPercent = New Vector2(0.5F, 0.9F)
+
+        Dim X As Single = PositionPercent.X
+        Dim FinalWrap As (StartPos As Single, EndPos As Single, LineHeightMultiplier As Single)
+
+        If Wrap.LineHeightMultiplier.HasValue Then
+            FinalWrap.LineHeightMultiplier =
+            ClampFloat(Wrap.LineHeightMultiplier.Value, 0.7F, 10.0F)
+        Else
+            FinalWrap.LineHeightMultiplier = 1.0F
+        End If
+
+        If Wrap.Length.HasValue Then
+            Dim RequestedLength As Single = Math.Max(0.0F, Wrap.Length.Value)
+
+            Select Case FinalStyle.Justification
+                Case Justification.Center
+                    FinalWrap.StartPos = X - (RequestedLength / 2.0F)
+                    FinalWrap.EndPos = X + (RequestedLength / 2.0F)
+
+                Case Justification.Right
+                    FinalWrap.StartPos = X - RequestedLength
+                    FinalWrap.EndPos = X
+
+                Case Justification.Justify
+                    FinalWrap.StartPos = X
+                    FinalWrap.EndPos = X + RequestedLength
+
+                Case Else
+                    FinalWrap.StartPos = X
+                    FinalWrap.EndPos = X + RequestedLength
+            End Select
+        Else
+            FinalWrap.StartPos = 0.0F
+            FinalWrap.EndPos = 1.0F
+        End If
+
+        Dim SingleLineHeight As Single = 0.0F
+        SingleLineHeight = TextStyle.SetTextStyle(FinalStyle, FinalWrap, ViewportID, RenderID)
+
+        Dim ExplicitLines As String() = Nothing
+        Dim ExplicitLineCounts As Integer() = Nothing
+
+        Dim StringWidth As Single = 0.0F
+        Dim NumberOfLines As Integer = 0
+
+        If FinalText.IndexOf(TextColors.FX_LineBreak, StringComparison.Ordinal) >= 0 Then
+
+            ExplicitLines = SplitTextAtLineBreak(FinalText)
+
+            ReDim ExplicitLineCounts(ExplicitLines.Length - 1)
+
+            For i As Integer = 0 To ExplicitLines.Length - 1
+
+                Dim CurrentWidth As Single =
+            GetLiteralTextLineWidth(ExplicitLines(i))
+
+                StringWidth = Math.Max(StringWidth, CurrentWidth)
+
+                ExplicitLineCounts(i) = GetLiteralTextLineCount(
+            ExplicitLines(i),
+            FinalWrap.StartPos,
+            FinalWrap.EndPos)
+
+                NumberOfLines += ExplicitLineCounts(i)
+
+            Next
+
+        Else
+            StringWidth = [Call](Of Single)("GET_STRING_WIDTH_WITH_STRING", "STRING", FinalText)
+            If FinalText.Length > 0 Then
+                NumberOfLines = [Call](Of Integer)("GET_NUMBER_LINES_WITH_LITERAL_STRINGS", FinalWrap.StartPos, FinalWrap.EndPos, "STRING", "", FinalText)
+                NumberOfLines = Math.Max(1, NumberOfLines)
+            End If
+        End If
+
+        Dim TotalHeight As Single = CSng(NumberOfLines) * (SingleLineHeight * FinalWrap.LineHeightMultiplier)
+        Dim BackgroundSize As New Vector2(0.0F, 0.0F)
+        Dim BackgroundPosition As Vector2? = Nothing
+
+        If FinalStyle.Background.Alpha > 0 AndAlso NumberOfLines > 0 Then
+
+            Dim BackgroundWidth As Single
+
+            If FinalStyle.Justification = NativeDraws.Justification.Justify Then
+
+                ' L'intero wrap, non soltanto la larghezza del testo.
+                BackgroundWidth = Math.Max(
+            0.0F,
+            FinalWrap.EndPos - FinalWrap.StartPos)
+
+            Else
+
+                BackgroundWidth = Math.Max(0.0F, StringWidth)
+
+                If Wrap.Length.HasValue AndAlso Wrap.Length.Value > 0.0F Then
+                    BackgroundWidth = Math.Min(
+                BackgroundWidth,
+                Wrap.Length.Value)
+                End If
+
+            End If
+
+            BackgroundSize = New Vector2(
+        BackgroundWidth + (BackgroundHorizontalPadding * 2.0F),
+        TotalHeight + (BackgroundVerticalPadding * 2.0F))
+
+            If BackgroundSize.X > 0.0F Then
+
+                BackgroundPosition = CalculateTextBackgroundPosition(
+            PositionPercent,
+            BackgroundSize,
+            FinalStyle.Justification,
+            FinalWrap.StartPos,
+            FinalWrap.EndPos,
+            HorizontalPadding:=BackgroundHorizontalPadding)
+
+            End If
+
+        End If
+
+        If Duration < 5 Then
+            If BackgroundPosition.HasValue Then DrawRectangle(BackgroundPosition.Value, BackgroundSize, FinalStyle.Background, Duration:=1)
+
+            If ExplicitLines IsNot Nothing Then
+
+                RenderLiteralTextLines(
+        ExplicitLines,
+        PositionPercent,
+        FinalStyle,
+        FinalWrap,
+        ViewportID,
+        RenderID,
+        ExplicitLineCounts)
+
+            Else
+
+                TextStyle.SetTextStyle(
+        FinalStyle,
+        FinalWrap,
+        ViewportID,
+        RenderID)
+
+                [Call]("DISPLAY_TEXT_WITH_LITERAL_STRING", PositionPercent.X, PositionPercent.Y, "STRING", FinalText)
+            End If
+        Else
+            DrawManager.DrawText(FinalText, Duration, PositionPercent, FinalStyle, BackgroundSize, FinalWrap, ViewportID, RenderID, BackgroundPosition)
+        End If
+
+        Return (Width:=StringWidth, Height:=TotalHeight, LineCount:=NumberOfLines)
+    End Function
+    '=========================================================================================================================================================================================
+    ''' <summary>
+    ''' Draws a rectangular window with optional borders and title area.
+    ''' The position is the top-left anchor by default.
+    ''' CenteredX and CenteredY can be enabled independently.
+    ''' For durations of at least 5 milliseconds, the window and title
+    ''' area share a single DrawManager request and the same lifetime.
+    ''' </summary>
+    ''' <param name="PercentagePos">The normalized window position.</param>
+    ''' <param name="PercentageSize">The normalized window size.</param>
+    ''' <param name="Color">The window fill color. Defaults to translucent black.</param>
+    ''' <param name="Duration">The requested display duration in milliseconds.</param>
+    ''' <param name="CenteredX">If True, X specifies the horizontal center.</param>
+    ''' <param name="CenteredY">If True, Y specifies the vertical center.</param>
+    ''' <param name="TitleLabelHeight">Optional height of the title area.</param>
+    Public Shared Sub DrawWindow(PercentagePos As Vector2, PercentageSize As Vector2, Optional Color As ColorRGBA = Nothing, Optional CenteredX As Boolean = False,
+                                 Optional CenteredY As Boolean = False, Optional Duration As Integer = 1, Optional TitleLabelHeight As Single = 0.0F)
+        If PercentageSize.X <= 0.0F OrElse PercentageSize.Y <= 0.0F Then Return
+
+        Dim FinalColor As ColorRGBA
+        If Color = Nothing Then
+            FinalColor = New ColorRGBA(0, 0, 0, 180)
+        Else
+            FinalColor = Color
+        End If
+
+        Dim BorderColor As ColorRGBA = FinalColor.Darken(1.7F)
+
+        BorderColor.Alpha =
+        FinalColor.Alpha +
+        ((255 - FinalColor.Alpha) \ 2)
+
+        Dim FinalTitleHeight As Single = 0.0F
+
+        If TitleLabelHeight > 0.0F Then
+            FinalTitleHeight =
+            Math.Min(TitleLabelHeight, PercentageSize.Y)
+        End If
+
+        Dim CenterPosition As Vector2 = PercentagePos
+
+        If Not CenteredX Then CenterPosition.X += PercentageSize.X / 2.0F
+        If Not CenteredY Then CenterPosition.Y += PercentageSize.Y / 2.0F
+
+        If Duration < 5 Then
+            DrawRectangle(CenterPosition, PercentageSize, FinalColor, Duration, True, True, 0.00165F, BorderColor)
+
+            If FinalTitleHeight > 0.0F Then
+                Dim TitleCenterY As Single = CenterPosition.Y - (PercentageSize.Y / 2.0F) + (FinalTitleHeight / 2.0F)
+                DrawRectangle(New Vector2(CenterPosition.X, TitleCenterY), New Vector2(PercentageSize.X, FinalTitleHeight), FinalColor, Duration, True, True, 0.00165F, BorderColor)
+            End If
+        Else
+            DrawManager.DrawWindow(CenterPosition, PercentageSize, FinalColor, Duration, BorderColor, 0.00165F, FinalTitleHeight)
+        End If
+    End Sub
+    ''' <summary>
+    ''' Draws a curved window with an optional title area.
+    ''' The native position represents the top-left corner.
+    ''' CenteredX and CenteredY can be enabled independently.
+    ''' For durations of at least 5 milliseconds, the window and title
+    ''' area share a single DrawManager request and the same lifetime.
+    ''' </summary>
+    ''' <param name="PercentagePos">
+    ''' The normalized position. Each coordinate represents the top-left
+    ''' corner by default, or the center when its Centered option is True.
+    ''' </param>
+    ''' <param name="PercentageSize">The normalized window size.</param>
+    ''' <param name="Alpha">The window opacity, from 0 to 255.</param>
+    ''' <param name="Duration">Display duration in milliseconds.</param>
+    ''' <param name="CenteredX">If True, X specifies the horizontal center.</param>
+    ''' <param name="CenteredY">If True, Y specifies the vertical center.</param>
+    ''' <param name="TitleLabelHeight">Optional height of the title area.</param>
+    Public Shared Sub DrawWindowCurved(PercentagePos As Vector2, PercentageSize As Vector2, Optional Alpha As Byte = 180, Optional CenteredX As Boolean = False,
+                                       Optional CenteredY As Boolean = False, Optional Duration As Integer = 1, Optional TitleLabelHeight As Single = 0.0F)
+
+        If PercentageSize.X <= 0.0F OrElse PercentageSize.Y <= 0.0F Then Return
+
+        Dim TopLeftPosition As Vector2 = PercentagePos
+        If CenteredX Then TopLeftPosition.X -= PercentageSize.X / 2.0F
+        If CenteredY Then TopLeftPosition.Y -= PercentageSize.Y / 2.0F
+
+        Dim FinalTitleHeight As Single = 0.0F
+        If TitleLabelHeight > 0.0F Then FinalTitleHeight = Math.Min(TitleLabelHeight, PercentageSize.Y)
+
+        If Duration < 5 Then
+            [Call]("DRAW_CURVED_WINDOW", TopLeftPosition.X, TopLeftPosition.Y, PercentageSize.X, PercentageSize.Y, CInt(Alpha))
+            If FinalTitleHeight > 0.0F Then
+                [Call]("DRAW_CURVED_WINDOW", TopLeftPosition.X, TopLeftPosition.Y, PercentageSize.X, FinalTitleHeight, CInt(Alpha))
+            End If
+        Else
+            DrawManager.DrawCurvedWindow(TopLeftPosition, PercentageSize, CInt(Alpha), Duration, FinalTitleHeight)
+        End If
+    End Sub
+    ''' <summary>
+    ''' Draws a square window with optional borders and title area.
+    ''' Size is expressed as a percentage of screen height.
+    ''' The width is adjusted using the current screen aspect ratio.
+    ''' The position is top-left anchored by default.
+    ''' </summary>
+    ''' <param name="PercentagePos">The normalized window position.</param>
+    ''' <param name="Size">Square size relative to screen height.</param>
+    ''' <param name="Color">The window fill color.</param>
+    ''' <param name="Duration">Display duration in milliseconds.</param>
+    ''' <param name="CenteredX">If True, the position is the horizontal center.</param>
+    ''' <param name="CenteredY">If True, the position is the vertical center.</param>
+    ''' <param name="TitleLabelHeight">Optional title area height.</param>
+    Public Shared Sub DrawWindowSquare(PercentagePos As Vector2, Size As Single, Optional Color As ColorRGBA = Nothing, Optional CenteredX As Boolean = False,
+                                       Optional CenteredY As Boolean = False, Optional Duration As Integer = 1, Optional TitleLabelHeight As Single = 0.0F)
+
+        If Size <= 0.0F Then Return
+        Dim Aspect As Single = Tools.ScreenAspectRatio
+        If Aspect <= 0.0F Then Return
+        Dim SquareSize As New Vector2(Size / Aspect, Size)
+        DrawWindow(PercentagePos, SquareSize, Color, Duration, CenteredX, CenteredY, TitleLabelHeight)
+    End Sub
+    '=========================================================================================================================================================================================
     '''' <summary>
-    '''' Draws a customizable HUD progress bar, with background, text and screen anchoring.
+    '''' Returns the native vertical line-box height for the specified native Y scale (DrawText functions).
     '''' </summary>
-    'Public Class ProgressBarHUD
+    '''' <param name="ScaleY">The native vertical text scale.</param>
+    '''' <param name="LineHeightMultiplier">The line-height multiplier, clamped to the supported range.</param>
+    '''' <returns>The vertical space allocated to one line, in normalized screen coordinates.</returns>
+    'Public Shared Function GetLineHeight(ScaleY As Single, Optional LineHeightMultiplier As Single = 1.0F) As Single
+    '    If ScaleY <= 0.0F OrElse Single.IsNaN(ScaleY) OrElse Single.IsInfinity(ScaleY) Then
+    '        Return 0.0F
+    '    End If
 
-    '    Public Enum ScreenAnchor
-    '        Left
-    '        Right
-    '        ' Top
-    '        ' Bottom
-    '    End Enum
+    '    Dim FinalMultiplier As Single = ClampFloat(LineHeightMultiplier, 0.7F, 10.0F)
+    '    [Call]("SET_TEXT_SCALE", 1.0F, ScaleY)
+    '    Dim NativeLineHeight As Single = [Call](Of Single)("GET_LINE_HEIGHT")
+    '    Return Math.Max(0.0F, NativeLineHeight) * FinalMultiplier
+    'End Function
+    ''' <summary>
+    ''' Displays up to three lines of custom text at the lower-center
+    ''' portion of the screen.
+    ''' The default style is white, centered text.
+    ''' Repeated calls update the existing request and renew its
+    ''' five-second lifetime instead of creating additional requests.
+    ''' When calls stop, the last displayed text expires naturally
+    ''' after five seconds.
+    ''' </summary>
+    ''' <param name="Text">The first line.</param>
+    ''' <param name="Text2">Optional second line.</param>
+    ''' <param name="Text3">Optional third line.</param>
+    Public Shared Sub Print(Text As String, Optional Text2 As String = Nothing, Optional Text3 As String = Nothing)
+        Dim Lines As New List(Of String)
+        Lines.Add(If(Text, String.Empty))
+        If Not String.IsNullOrEmpty(Text2) Then
+            Lines.Add(Text2)
+        End If
+        If Not String.IsNullOrEmpty(Text3) Then
+            Lines.Add(Text3)
+        End If
+        Dim ColouredLines(Lines.Count - 1) As String
+        For i As Integer = 0 To Lines.Count - 1
+            ColouredLines(i) = TextColors.MP_Yellow & Lines(i)
+        Next
+        Dim ColouredText As String = String.Join("~n~", ColouredLines)
+        Dim Style As New TextStyle(Color:=ColorRGBA.White, Size:=12, Justification:=NativeDraws.Justification.Center, BorderColor:=ColorRGBA.Black, Font:=TextStyle.Fonts.Standard, Shadow:=False, WidthScale:=1.0F)
+        Dim PositionY As Single = 0.946F
+        DrawManager.DrawPersistentText("PrintText", ColouredText, 5000, New Vector2(0.5F, PositionY), Style, TextLines:=ColouredLines, LineSpacingY:=0.015F)
+    End Sub
+    ''' <summary>
+    ''' Displays a custom text using a native PrintBig position and style.
+    ''' Each BigPrintType has an independent queue.
+    ''' When DisplayNow is False, the text is displayed immediately if
+    ''' no custom message of the same type is active; otherwise it is
+    ''' queued and displayed when the previous message expires.
+    ''' When DisplayNow is True, the active custom message and all
+    ''' queued messages of the same type are discarded, and the new
+    ''' text is displayed immediately.
+    ''' Other BigPrintType values are not affected.
+    ''' </summary>
+    ''' <param name="Text">The custom text to display.</param>
+    ''' <param name="Duration">Display duration in milliseconds.</param>
+    ''' <param name="Type">The native position and display type to use.</param>
+    ''' <param name="Color"> Optional custom color. When omitted, the native StringColor associated with the selected type is used.</param>
+    ''' <param name="Font">Optional override for the native font.</param>
+    ''' <param name="WidthCoef"> Optional horizontal width coefficient. When omitted, the coefficient associated with Type is used.</param>
+    ''' <param name="QueueMode">If True, immediately replaces the active and queued custom messages of the same type.
+    ''' </param>
+    Public Shared Sub PrintBig(Text As String, Optional Duration As Integer = 5000, Optional Type As BigPrintType = BigPrintType.Center_Standard,
+                                   Optional Color As ColorRGBA? = Nothing, Optional Font As TextStyle.Fonts? = Nothing, Optional WidthCoef As Single? = Nothing,
+                                   Optional QueueMode As QueueMode? = QueueMode.AddToQueue)
 
-    '    '========================
-    '    '   PROPERTIES
-    '    '========================
-    '    Public Property Anchor As ScreenAnchor
-    '    Public Property Position As Vector2        ' in percentuale (0–1)
-    '    Public Property Size As Vector2            ' in percentuale (0–1)
-    '    Public Property Color As ColorRGBA
-    '    Public Property BackColor As ColorRGBA
-    '    Public Property Text As String
-    '    Public Property TextOffsetX As Single = 0.02F
-    '    Public Property Percentage As Single        ' 0.0 – 1.0
-    '    Public Property Alpha As Integer = 180
+        Dim DisplayString As String = If(Text, String.Empty)
+        Dim Col As ColorRGBA = ColorRGBA.White
+        Dim StringColor As String = String.Empty
+        Dim SelectedFont As TextStyle.Fonts
+        Dim FinalStyle As TextStyle
+        Dim PositionX As Single = 0.5F
+        Dim PositionY As Single = 0.5F
+        Dim TextSize As Integer = 49
+        Dim DefaultWidthCoef As Single = 1.0F
+        Dim TextJustification As NativeDraws.Justification = NativeDraws.Justification.Center
+        Dim BorderColor As ColorRGBA = Nothing
 
-    '    '========================
-    '    '   COSTRUTTORE
-    '    '========================
-    '    Public Sub New(anchor As ScreenAnchor, pos As Vector2, size As Vector2, color As ColorRGBA)
+        Select Case Type
+            Case BigPrintType.Center_GtaNumbers
+                PositionX = 0.5F
+                PositionY = 0.45F
+                TextSize = 49
+                TextJustification = NativeDraws.Justification.Center
+                BorderColor = ColorRGBA.Black
+                SelectedFont = TextStyle.Fonts.StandardUppercase_GtaNumbers
+                DefaultWidthCoef = 0.86F
+                If Color.HasValue Then
+                    Col = Color.Value
+                    StringColor = String.Empty
+                Else
+                    Col = ColorRGBA.White
+                    StringColor = TextColors.Red
+                End If
 
-    '        Me.Anchor = anchor
-    '        Me.Position = pos
-    '        Me.Size = size
-    '        Me.Color = color
+            Case BigPrintType.Center_Standard
+                PositionX = 0.5F
+                PositionY = 0.5F
+                TextSize = 49
+                TextJustification = NativeDraws.Justification.Center
+                BorderColor = ColorRGBA.Black
+                SelectedFont = TextStyle.Fonts.Standard
+                DefaultWidthCoef = 1.37F
+                If Color.HasValue Then
+                    Col = Color.Value
+                    StringColor = String.Empty
+                Else
+                    Col = ColorRGBA.White
+                    StringColor = TextColors.Green
+                End If
 
-    '        ' background leggermente più scuro
-    '        Me.BackColor = New ColorRGBA(color.Red \ 2, color.Green \ 2, color.Blue \ 2, 180)
+            Case BigPrintType.BottomRight_Narrow
+                PositionX = 0.946F
+                PositionY = 0.91F
+                TextSize = 36
+                TextJustification = NativeDraws.Justification.Left
+                BorderColor = ColorRGBA.Black
+                SelectedFont = TextStyle.Fonts.Narrow
+                DefaultWidthCoef = 0.8F
+                If Color.HasValue Then
+                    Col = Color.Value
+                    StringColor = String.Empty
+                Else
+                    Col = ColorRGBA.White
+                    StringColor = TextColors.Gray
+                End If
 
-    '        Me.Percentage = 1.0F
-    '        Me.Text = ""
-    '    End Sub
+            Case Else
+                Throw New ArgumentOutOfRangeException(NameOf(Type), Type, "The specified BigPrintType is not implemented by PrintBigText.")
+        End Select
+        '-----
+        If Font.HasValue Then
+            SelectedFont = Font.Value
+        End If
+        '--
+        Dim FinalWidthCoef As Single = If(WidthCoef.HasValue, Math.Max(0.0F, WidthCoef.Value), DefaultWidthCoef)
+        '--
+        FinalStyle = New TextStyle(Color:=Col, Size:=TextSize, Justification:=TextJustification, BorderColor:=BorderColor, Font:=SelectedFont, Shadow:=False, WidthScale:=FinalWidthCoef)
 
-    '    '========================
-    '    '   DRAW
-    '    '========================
-    '    Public Sub Draw(Optional Duration As Integer = 1)
+        ' GXT.PrintBig("STRING", 2, Type)
+        Dim FinalText As String = StringColor & DisplayString
+        If Type = BigPrintType.BottomRight_Narrow Then
 
-    '        '-------------------------------------
-    '        ' 1) DRAW FINESTRA SFONDO (Curved Window)
-    '        '-------------------------------------
-    '        If Duration < 5 Then
-    '            [Call]("DRAW_CURVED_WINDOW",
-    '               Position.X,
-    '               Position.Y,
-    '               Size.X,
-    '               Size.Y,
-    '               Alpha)
-    '        Else
-    '            DrawCurvedWindow(Position, Size, Alpha, Duration)
-    '        End If
+            TextStyle.SetTextStyle(FinalStyle, (StartPos:=0.0F, EndPos:=1.0F, LineHeightMultiplier:=1.0F))
+            Dim StringWidth As Single = [Call](Of Single)("GET_STRING_WIDTH_WITH_STRING", "STRING", FinalText)
+            PositionX = Math.Max(0.0F, 0.95F - StringWidth)
+        End If
 
-    '        '-------------------------------------
-    '        ' 2) DRAW BAR BACKGROUND (rettangolo scuro)
-    '        '-------------------------------------
-    '        Dim barPos As Vector2 = Position
-    '        Dim barSize As Vector2 = New Vector2(Size.X * 0.75F, Size.Y * 0.55F)
+        DrawManager.DrawBigPrintText(
+            FinalText,
+            Duration,
+            Type,
+            New Vector2(PositionX, PositionY),
+            FinalStyle,
+            QueueMode)
 
-    '        Select Case Anchor
-    '            Case ScreenAnchor.Left
-    '            ' tutto normale
-    '            Case ScreenAnchor.Right
-    '                ' inverti la posizione per ancorare a destra
-    '                barPos.X = 1.0F - Position.X
-    '        End Select
+    End Sub
+    Public Shared Sub PrintHelp(Text As String, Optional Duration As Integer = 7000, Optional NoSound As Boolean = False, Optional DisplayNow As Boolean = False, Optional IgnoreIfQueued As Boolean = True, Optional Color As ColorRGBA? = Nothing, Optional Background As ColorRGBA? = Nothing, Optional QueueMode As QueueMode? = Nothing)
 
-    '        DrawRectangle(barPos, barSize, BackColor, Duration, False)
+        If String.IsNullOrEmpty(Text) Then Return
+        If Duration = 0 OrElse Duration < -1 Then Throw New ArgumentOutOfRangeException(NameOf(Duration), "Duration must be -1 (forever) or positive.")
 
-    '        '-------------------------------------
-    '        ' 3) DRAW FILL BAR (rettangolo pieno)
-    '        '-------------------------------------
-    '        Dim fillSize As New Vector2(barSize.X * Percentage, barSize.Y)
-    '        DrawRectangle(barPos, fillSize, Color, Duration, False)
+        Dim Mode As QueueMode
+        If QueueMode.HasValue Then
+            Mode = QueueMode.Value
+        ElseIf DisplayNow Then
+            Mode = NativeDraws.QueueMode.DisplayNow
+        ElseIf IgnoreIfQueued Then
+            Mode = NativeDraws.QueueMode.IgnoreIfBusy
+        Else
+            Mode = NativeDraws.QueueMode.AddToQueue
+        End If
 
-    '        '-------------------------------------
-    '        ' 4) DRAW TEXT (a destra o sinistra)
-    '        '-------------------------------------
-    '        If Text <> "" Then
-    '            Dim textX As Single
+        Dim FinalColor As ColorRGBA = If(Color.HasValue, Color.Value, HelpTextStyle.Color)
+        Dim FinalBackground As ColorRGBA = If(Background.HasValue, Background.Value, New ColorRGBA(0, 0, 0, 180))
+        Dim Style As TextStyle = HelpTextStyle.WithColor(FinalColor).WithBackground(FinalBackground)
 
-    '            If Anchor = ScreenAnchor.Left Then
-    '                textX = barPos.X + barSize.X + TextOffsetX
-    '            Else
-    '                textX = barPos.X - TextOffsetX
-    '            End If
+        Dim FinalWrap As (StartPos As Single, EndPos As Single, LineHeightMultiplier As Single) = (StartPos:=HelpTextPosition.X, EndPos:=HelpTextPosition.X + HelpTextWrap.Length, LineHeightMultiplier:=ClampFloat(HelpTextWrap.LineHeightMultiplier, 0.7F, 10.0F))
+        Dim NativeWrap As (StartPos As Single?, EndPos As Single?, LineHeightMultiplier As Single?) = (StartPos:=CType(FinalWrap.StartPos, Single?), EndPos:=CType(FinalWrap.EndPos, Single?), LineHeightMultiplier:=CType(FinalWrap.LineHeightMultiplier, Single?))
 
-    '            '  [Call]("PRINT_STRING_WITH_LITERAL_STRING", "STRING", Text, 700, textX, Position.Y)
-    '        End If
+        Dim SingleLineHeight As Single = TextStyle.SetTextStyle(Style, NativeWrap)
 
-    '    End Sub
+        Dim StringWidth As Single = 0.0F
+        Dim NumberOfLines As Integer = 0
 
-    'End Class
+        If Text.IndexOf(TextColors.FX_LineBreak, StringComparison.Ordinal) >= 0 Then
 
-    '-------------------------------------------------------------------------------------------------------
+            Dim ExplicitLines As String() = SplitTextAtLineBreak(Text)
+
+            For Each Line As String In ExplicitLines
+
+                ' La larghezza complessiva è quella della linea più larga.
+                Dim CurrentWidth As Single = GetLiteralTextLineWidth(Line)
+                StringWidth = Math.Max(StringWidth, CurrentWidth)
+
+                ' Conta anche le linee vuote e le eventuali righe
+                ' aggiuntive dovute al wrapping nativo.
+                NumberOfLines += GetLiteralTextLineCount(
+            Line,
+            FinalWrap.StartPos,
+            FinalWrap.EndPos)
+
+            Next
+
+        Else
+
+            ' Mantiene il comportamento originale se non ci sono line break.
+            StringWidth =
+        [Call](Of Single)(
+            "GET_STRING_WIDTH_WITH_STRING",
+            "STRING",
+            Text)
+
+            If Text.Length > 0 Then
+
+                NumberOfLines =
+            Math.Max(
+                1,
+                [Call](Of Integer)(
+                    "GET_NUMBER_LINES_WITH_LITERAL_STRINGS",
+                    FinalWrap.StartPos,
+                    FinalWrap.EndPos,
+                    "STRING",
+                    "",
+                    Text))
+
+            End If
+
+        End If
+
+        Dim TotalHeight As Single = CSng(NumberOfLines) * SingleLineHeight * FinalWrap.LineHeightMultiplier
+        Dim BackgroundSize As New Vector2(0.0F, 0.0F)
+        Dim BackgroundPosition As Vector2? = Nothing
+
+        If FinalBackground.Alpha > 0 AndAlso NumberOfLines > 0 Then
+
+            Dim BackgroundWidth As Single
+
+            If NumberOfLines = 1 Then
+                BackgroundWidth = Math.Min(HelpTextWrap.Length, Math.Max(0.0F, StringWidth) + HelpTextRightPadding)
+            Else
+                BackgroundWidth = HelpTextWrap.Length
+            End If
+            BackgroundWidth += HelpTextPosition.X - HelpTextBoxLeft
+
+            BackgroundSize = New Vector2(BackgroundWidth, TotalHeight + (BackgroundVerticalPadding * 2.0F))
+            BackgroundSize = New Vector2(BackgroundWidth, TotalHeight + (BackgroundVerticalPadding * 2.0F))
+            If BackgroundSize.X > 0.0F Then
+                BackgroundPosition = CalculateTextBackgroundPosition(New Vector2(HelpTextBoxLeft, HelpTextPosition.Y), BackgroundSize, Justification.Left, FinalWrap.StartPos, FinalWrap.EndPos)
+            End If
+        End If
+
+        DrawManager.DrawHelpText(Text, Duration, HelpTextPosition, Style, BackgroundSize, NativeWrap, BackgroundPosition, Mode, Not NoSound)
+    End Sub
+
+    '======================================================================================================================================================================
     Public Structure ColorRGBA
         Private _r As Integer
         Private _g As Integer
         Private _b As Integer
         Private _a As Integer
+        Public Shared ReadOnly Property Zero As ColorRGBA = New ColorRGBA(0, 0, 0, 0)
+
         Public Property Red As Byte
             Get
                 Return CByte(ClampInteger(_r, 0, 255))
@@ -298,6 +844,55 @@ Public Class NativeDraws
                 _a = value
             End Set
         End Property
+        Public Sub New(R As Byte, G As Byte, B As Byte, A As Byte)
+            _r = R
+            _g = G
+            _b = B
+            _a = A
+        End Sub
+        Public Function Invert() As ColorRGBA
+            Return New ColorRGBA(255 - _r, 255 - _g, 255 - _b, _a)
+        End Function
+        Public Function Brighten(Optional Factor As Single = 1.5) As ColorRGBA
+            If Factor <= 0.0F OrElse Single.IsNaN(Factor) OrElse Single.IsInfinity(Factor) Then
+                Throw New ArgumentOutOfRangeException(NameOf(Factor), "Factor must be a finite value greater than zero.")
+            End If
+            Return New ColorRGBA(
+                ClampInteger(CInt(_r * Factor), 0, 255),
+                ClampInteger(CInt(_g * Factor), 0, 255),
+                ClampInteger(CInt(_b * Factor), 0, 255),
+                _a)
+        End Function
+        Public Function Darken(Optional Factor As Single = 1.5) As ColorRGBA
+            If Factor <= 0.0F OrElse Single.IsNaN(Factor) OrElse Single.IsInfinity(Factor) Then
+                Throw New ArgumentOutOfRangeException(NameOf(Factor), "Factor must be a finite value greater than zero.")
+            End If
+            Return New ColorRGBA(
+                ClampInteger(CInt(_r / Factor), 0, 255),
+                ClampInteger(CInt(_g / Factor), 0, 255),
+                ClampInteger(CInt(_b / Factor), 0, 255),
+                _a)
+        End Function
+        ''' <summary>
+        ''' Returns if colors are the same or not.
+        ''' </summary>
+        Public Overrides Function Equals(ColorRGBA As Object) As Boolean
+            If Not TypeOf ColorRGBA Is ColorRGBA Then Return False
+            Dim c As ColorRGBA = CType(ColorRGBA, ColorRGBA)
+            Return Red = c.Red AndAlso Green = c.Green AndAlso Blue = c.Blue AndAlso Alpha = c.Alpha
+        End Function
+        Public Function ToARGB() As System.Drawing.Color
+            Return Drawing.Color.FromArgb(_a, _r, _g, _b)
+        End Function
+        Public Function ToHex() As Integer
+            Return (_a << 24) Or (_r << 16) Or (_g << 8) Or _b
+        End Function
+        Public Overrides Function ToString() As String
+            Return $"Color: R={Red}, G={Green}, B={Blue}, A={Alpha}"
+        End Function
+        '===========================================================================================
+        'Shared
+        '---------
         Public Shared ReadOnly Property Black As ColorRGBA
             Get
                 Return New ColorRGBA(0, 0, 0, 255)
@@ -313,28 +908,9 @@ Public Class NativeDraws
                 Return New ColorRGBA(255, 255, 255, 255)
             End Get
         End Property
-        Public Sub New(R As Byte, G As Byte, B As Byte, A As Byte)
-            _r = R
-            _g = G
-            _b = B
-            _a = A
-        End Sub
-        Public Overrides Function ToString() As String
-            Return $"Color RGBA: R={Red}, G={Green}, B={Blue}, A={Alpha}"
-        End Function
-        Public Function ToHex() As Integer
-            Return (_a << 24) Or (_r << 16) Or (_g << 8) Or _b
-        End Function
-        Public Overrides Function Equals(obj As Object) As Boolean
-            If Not TypeOf obj Is ColorRGBA Then Return False
-            Dim c As ColorRGBA = CType(obj, ColorRGBA)
-            Return Red = c.Red AndAlso Green = c.Green AndAlso Blue = c.Blue AndAlso Alpha = c.Alpha
-        End Function
-
         Public Shared Operator =(Color1 As ColorRGBA, Color2 As ColorRGBA) As Boolean
             Return Color1.Red = Color2.Red AndAlso Color1.Green = Color2.Green AndAlso Color1.Blue = Color2.Blue AndAlso Color1.Alpha = Color2.Alpha
         End Operator
-
         Public Shared Operator <>(Color1 As ColorRGBA, Color2 As ColorRGBA) As Boolean
             Return Not (Color1 = Color2)
         End Operator
@@ -345,12 +921,35 @@ Public Class NativeDraws
             Dim b As Byte = CByte(ARGB And &HFF)
             Return New ColorRGBA(r, g, b, a)
         End Function
+        Public Shared Function Invert(Color As ColorRGBA) As ColorRGBA
+            Return New ColorRGBA(255 - Color.Red, 255 - Color.Green, 255 - Color.Blue, Color.Alpha)
+        End Function
+        Public Shared Function Brighten(Color As ColorRGBA, Optional Factor As Single = 1.5) As ColorRGBA
+            Return New ColorRGBA(
+                ClampInteger(CInt(Color.Red * Factor), 0, 255),
+                ClampInteger(CInt(Color.Green * Factor), 0, 255),
+                ClampInteger(CInt(Color.Blue * Factor), 0, 255),
+                Color.Alpha)
+        End Function
+        Public Shared Function Darken(Color As ColorRGBA, Optional Factor As Single = 1.5) As ColorRGBA
+            Return New ColorRGBA(
+                ClampInteger(CInt(Color.Red / Factor), 0, 255),
+                ClampInteger(CInt(Color.Green / Factor), 0, 255),
+                ClampInteger(CInt(Color.Blue / Factor), 0, 255),
+                Color.Alpha)
+        End Function
     End Structure
     Public Structure ColorRGB
         Private _r As Integer
         Private _g As Integer
         Private _b As Integer
         Private _a As Integer
+        Public Sub New(R As Byte, G As Byte, B As Byte)
+            _r = R
+            _g = G
+            _b = B
+            _a = 255
+        End Sub
         Public Property Red As Byte
             Get
                 Return CByte(ClampInteger(_r, 0, 255))
@@ -375,6 +974,47 @@ Public Class NativeDraws
                 _b = value
             End Set
         End Property
+        Public Function Invert() As ColorRGB
+            Return New ColorRGB(255 - _r, 255 - _g, 255 - _b)
+        End Function
+        Public Function Brighten(Optional Factor As Single = 1.5) As ColorRGB
+            If Factor <= 0.0F OrElse Single.IsNaN(Factor) OrElse Single.IsInfinity(Factor) Then
+                Throw New ArgumentOutOfRangeException(NameOf(Factor), "Factor must be a finite value greater than zero.")
+            End If
+            Return New ColorRGB(
+                ClampInteger(CInt(_r * Factor), 0, 255),
+                ClampInteger(CInt(_g * Factor), 0, 255),
+                ClampInteger(CInt(_b * Factor), 0, 255))
+        End Function
+        Public Function Darken(Optional Factor As Single = 1.5) As ColorRGB
+            If Factor <= 0.0F OrElse Single.IsNaN(Factor) OrElse Single.IsInfinity(Factor) Then
+                Throw New ArgumentOutOfRangeException(NameOf(Factor), "Factor must be a finite value greater than zero.")
+            End If
+            Return New ColorRGB(
+                ClampInteger(CInt(_r / Factor), 0, 255),
+                ClampInteger(CInt(_g / Factor), 0, 255),
+                ClampInteger(CInt(_b / Factor), 0, 255))
+        End Function
+        ''' <summary>
+        ''' Returns if colors are the same or not.
+        ''' </summary>
+        Public Overrides Function Equals(ColorRGB As Object) As Boolean
+            If Not TypeOf ColorRGB Is ColorRGB Then Return False
+            Dim c As ColorRGB = CType(ColorRGB, ColorRGB)
+            Return Red = c.Red AndAlso Green = c.Green AndAlso Blue = c.Blue
+        End Function
+        Public Function ToARGB() As System.Drawing.Color
+            Return Drawing.Color.FromArgb(_a, _r, _g, _b)
+        End Function
+        Public Function ToHex() As Integer
+            Return (_a << 24) Or (_r << 16) Or (_g << 8) Or _b
+        End Function
+        Public Overrides Function ToString() As String
+            Return $"Color: R={Red}, G={Green}, B={Blue}"
+        End Function
+        '===========================================================================================
+        'Shared
+        '---------
         Public Shared ReadOnly Property Black As ColorRGB
             Get
                 Return New ColorRGB(0, 0, 0)
@@ -385,68 +1025,56 @@ Public Class NativeDraws
                 Return New ColorRGB(255, 255, 255)
             End Get
         End Property
-        Public Sub New(R As Byte, G As Byte, B As Byte)
-            _r = R
-            _g = G
-            _b = B
-            _a = 255
-        End Sub
-        Public Overrides Function ToString() As String
-            Return $"Color RGBA: R={Red}, G={Green}, B={Blue}"
-        End Function
-        Public Function ToHex() As Integer
-            Return (_a << 24) Or (_r << 16) Or (_g << 8) Or _b
-        End Function
-        Public Shared Function FromHext(ARGB As Integer) As ColorRGBA
+        Public Shared Function FromHex(ARGB As Integer) As ColorRGB
             Dim a As Byte = CByte((ARGB >> 24) And &HFF)
             Dim r As Byte = CByte((ARGB >> 16) And &HFF)
             Dim g As Byte = CByte((ARGB >> 8) And &HFF)
             Dim b As Byte = CByte(ARGB And &HFF)
-            Return New ColorRGBA(r, g, b, a)
+            Return New ColorRGB(r, g, b)
         End Function
-        Public Overrides Function Equals(obj As Object) As Boolean
-            If Not TypeOf obj Is ColorRGBA Then Return False
-            Dim c As ColorRGB = CType(obj, ColorRGB)
-            Return Red = c.Red AndAlso Green = c.Green AndAlso Blue = c.Blue
-        End Function
-
         Public Shared Operator =(Color1 As ColorRGB, Color2 As ColorRGB) As Boolean
             Return Color1.Red = Color2.Red AndAlso Color1.Green = Color2.Green AndAlso Color1.Blue = Color2.Blue
         End Operator
-
         Public Shared Operator <>(Color1 As ColorRGB, Color2 As ColorRGB) As Boolean
             Return Not (Color1 = Color2)
         End Operator
+        Public Shared Function Invert(Color As ColorRGB) As ColorRGB
+            Return New ColorRGB(255 - Color.Red, 255 - Color.Green, 255 - Color.Blue)
+        End Function
+        Public Shared Function Brighten(Color As ColorRGB, Optional Factor As Single = 1.5) As ColorRGB
+            Return New ColorRGB(
+                ClampInteger(CInt(Color.Red * Factor), 0, 255),
+                ClampInteger(CInt(Color.Green * Factor), 0, 255),
+                ClampInteger(CInt(Color.Blue * Factor), 0, 255))
+        End Function
+        Public Shared Function Darken(Color As ColorRGB, Optional Factor As Single = 1.5) As ColorRGB
+            Return New ColorRGB(
+                ClampInteger(CInt(Color.Red / Factor), 0, 255),
+                ClampInteger(CInt(Color.Green / Factor), 0, 255),
+                ClampInteger(CInt(Color.Blue / Factor), 0, 255))
+        End Function
     End Structure
-    '-------------------------------------------------------------------------------------------------------
+    '======================================================================================================================================================================
     ''' <summary>
     ''' Provides manual fade-in/out control without native functions.
     ''' Automatically hooks into TickHelper and supports color and minimum/maximum alpha.
     ''' </summary>
-    Public Class CustomFades
-        Private Enum FadeDirection
-            None
-            Inward
-            Outward
-        End Enum
-
-        Private Shared fadeState As FadeDirection = FadeDirection.None
-        Private Shared fadeStart As DateTime
-        Private Shared fadeDuration As Integer
-        Private Shared holdDuration As Integer
-        Private Shared currentAlpha As Integer = 0
-        Private Shared startAlpha As Integer = 0
-        Private Shared endAlpha As Integer = 0
-        Private Shared fadeColor As ColorRGB = New ColorRGB(0, 0, 0)
-        Private Shared registeredInTick As Boolean = False
-        Private Shared isHolding As Boolean = False
-        Private Shared holdStartTime As DateTime
-        Private Shared isPauseMenuDisabled As Boolean = False
-        Private Shared shouldReenablePauseMenu As Boolean = False
-        ' Store last used alpha limits for reference
-        Private Shared lastMinAlpha As Integer = 0
-        Private Shared lastMaxAlpha As Integer = 255
-
+    Public NotInheritable Class CustomFade
+        Private Sub New() : End Sub
+        ''' <summary>
+        ''' Cancels any fade and clears the overlay immediately.
+        ''' </summary>
+        Public Shared Sub CancelAll()
+            fadeState = FadeDirection.None
+            currentAlpha = 0
+            isHolding = False
+            ' If isPauseMenuDisabled Then
+            'NativeGeneric.PauseMenu.Disable = False
+            ' isPauseMenuDisabled = False
+            ' End If
+            shouldReenablePauseMenu = False
+            UnregisterFromTick()
+        End Sub
         ''' <summary>
         ''' Returns True if a fade effect (or hold) is currently active.
         ''' </summary>
@@ -489,7 +1117,7 @@ Public Class NativeDraws
         ''' Color: ColorRGB (if Nothing -> Black).
         ''' MinAlpha/MaxAlpha: limit range 0-255 (min = visible, max = opaque).
         ''' </summary>
-        Public Shared Sub FadeIn(Optional Duration As Integer = 2000, Optional ByVal Color As ColorRGB = Nothing, Optional MinAlpha As Integer = 0, Optional MaxAlpha As Integer = 255)
+        Public Shared Sub FadeIn(Optional Duration As Integer = 2000, Optional ByVal Color As ColorRGB = Nothing, Optional MinAlpha As Byte = 0, Optional MaxAlpha As Byte = 255)
 
             If Color = Nothing Then
                 fadeColor = New ColorRGB(0, 0, 0)
@@ -508,7 +1136,7 @@ Public Class NativeDraws
             isHolding = holdDuration > 0
             holdStartTime = DateTime.Now
 
-            ' Caso istantaneo: impostiamo il valore e lasciamo il draw permanente se opaco (se vuoi che sia istantaneo e non persistente, chiama CancelAll)
+
             If fadeDuration <= 0 AndAlso holdDuration <= 0 Then
                 currentAlpha = endAlpha
                 fadeState = FadeDirection.None
@@ -517,11 +1145,11 @@ Public Class NativeDraws
                     RegisterToTick()
                 Else
                     UnregisterFromTick()
-                    If isPauseMenuDisabled Then
-                        NativeGeneric.DisablePauseMenu(False)
-                        isPauseMenuDisabled = False
-                        shouldReenablePauseMenu = False
-                    End If
+                    '    If isPauseMenuDisabled Then
+                    'NativeGeneric.PauseMenu.Disable = False
+                    '    isPauseMenuDisabled = False
+                    '   shouldReenablePauseMenu = False
+                    'E'nd If
                 End If
                 Return
             End If
@@ -538,7 +1166,7 @@ Public Class NativeDraws
         ''' Duration in ms. HideRadar: if True hides the radar immediately.
         ''' Color: ColorRGB (if Nothing -> Black).
         ''' </summary>
-        Public Shared Sub FadeOut(Optional Duration As Integer = 2000, Optional ByVal Color As ColorRGB = Nothing, Optional MinAlpha As Integer = 0, Optional MaxAlpha As Integer = 255, Optional DisablePauseMenu As Boolean = False)
+        Public Shared Sub FadeOut(Optional Duration As Integer = 2000, Optional ByVal Color As ColorRGB = Nothing, Optional MinAlpha As Byte = 0, Optional MaxAlpha As Byte = 255, Optional DisablePauseMenu As Boolean = True)
 
             If Color = Nothing Then
                 fadeColor = New ColorRGB(0, 0, 0)
@@ -549,8 +1177,8 @@ Public Class NativeDraws
             fadeState = FadeDirection.Outward
             fadeStart = DateTime.Now
             fadeDuration = Math.Max(0, Duration)
-            startAlpha = Tools.ClampInteger(MinAlpha, 0, 255)
-            endAlpha = Tools.ClampInteger(MaxAlpha, 0, 255)
+            startAlpha = MinAlpha
+            endAlpha = MaxAlpha
             currentAlpha = startAlpha
             lastMinAlpha = startAlpha
             lastMaxAlpha = endAlpha
@@ -565,7 +1193,7 @@ Public Class NativeDraws
                     RegisterToTick()
                 Else
                     If isPauseMenuDisabled Then
-                        NativeGeneric.DisablePauseMenu(False)
+                        '  NativeGeneric.PauseMenu.Disable = False
                         isPauseMenuDisabled = False
                     End If
                     UnregisterFromTick()
@@ -575,30 +1203,37 @@ Public Class NativeDraws
 
             RegisterToTick()
 
-            If DisablePauseMenu AndAlso Not isPauseMenuDisabled Then
-                NativeGeneric.DisablePauseMenu(True)
-                isPauseMenuDisabled = True
-            End If
+            'If DisablePauseMenu AndAlso Not isPauseMenuDisabled Then
+            ' NativeGeneric.PauseMenu.Disable = True
+            '  isPauseMenuDisabled = True
+            ' End If
         End Sub
 
-        ''' <summary>
-        ''' Cancels any fade and clears the overlay immediately.
-        ''' </summary>
-        Public Shared Sub CancelAll()
-            fadeState = FadeDirection.None
-            currentAlpha = 0
-            isHolding = False
-            If isPauseMenuDisabled Then
-                NativeGeneric.DisablePauseMenu(False)
-                isPauseMenuDisabled = False
-            End If
-            shouldReenablePauseMenu = False
-            UnregisterFromTick()
-        End Sub
+        '=========================================================================================================================================================================
+        ' Internals
+        '-------------
+        Private Enum FadeDirection
+            None
+            Inward
+            Outward
+        End Enum
 
-        ''' <summary>
-        ''' Internal update called every tick. If not fading but currentAlpha>0 we still allow draw to keep overlay persistent.
-        ''' </summary>
+        Private Shared fadeState As FadeDirection = FadeDirection.None
+        Private Shared fadeStart As DateTime
+        Private Shared fadeDuration As Integer
+        Private Shared holdDuration As Integer
+        Private Shared currentAlpha As Integer = 0
+        Private Shared startAlpha As Integer = 0
+        Private Shared endAlpha As Integer = 0
+        Private Shared fadeColor As ColorRGB = New ColorRGB(0, 0, 0)
+        Private Shared registeredInTick As Boolean = False
+        Private Shared isHolding As Boolean = False
+        Private Shared holdStartTime As DateTime
+        Private Shared isPauseMenuDisabled As Boolean = False
+        Private Shared shouldReenablePauseMenu As Boolean = False
+
+        Private Shared lastMinAlpha As Integer = 0
+        Private Shared lastMaxAlpha As Integer = 255
         Private Shared Sub update()
             If isHolding Then
                 Dim held As Integer = CInt((DateTime.Now - holdStartTime).TotalMilliseconds)
@@ -623,11 +1258,11 @@ Public Class NativeDraws
                 Dim finalAlpha As Integer = currentAlpha
                 fadeState = FadeDirection.None
 
-                If shouldReenablePauseMenu AndAlso finalAlpha <= lastMinAlpha Then
-                    NativeGeneric.DisablePauseMenu(False)
-                    isPauseMenuDisabled = False
-                    shouldReenablePauseMenu = False
-                End If
+                'If shouldReenablePauseMenu AndAlso finalAlpha <= lastMinAlpha Then
+                'NativeGeneric.PauseMenu.Disable = False
+                ' isPauseMenuDisabled = False
+                ' shouldReenablePauseMenu = False
+                ' End If
 
 
                 If finalAlpha <= 0 Then
@@ -638,248 +1273,545 @@ Public Class NativeDraws
                 End If
             End If
         End Sub
-
-        ''' <summary>
-        ''' Draws the fade rectangle every tick if currentAlpha > 0.
-        ''' </summary>
         Private Shared Sub draw()
             If currentAlpha <= 0 Then Return
 
-            ' disegna un rettangolo fullscreen con il colore e alpha corrente
             Dim c As ColorRGB = fadeColor
             Dim alphaSingle As Single = Tools.ClampInteger(currentAlpha, 0, 255) / 255.0F
-            ' supponendo NativeDraws.DrawRectangle accetti ColorRGBA con alpha oppure un overload:
-            NativeDraws.DrawRectangle(New Vector2(0.5F, 0.5F), New Vector2(1.0F, 1.0F), New ColorRGBA(c.Red, c.Green, c.Blue, currentAlpha), 1)
+
+            NativeDraws.DrawRectangle(New Vector2(0.5F, 0.5F), New Vector2(1.0F, 1.0F), New ColorRGBA(c.Red, c.Green, c.Blue, CByte(Tools.ClampInteger(currentAlpha, 0, 255))), Duration:=1)
         End Sub
-        ''' <summary>
-        ''' Internal Tick callback.
-        ''' </summary>
         Private Shared Sub internalTick()
             update()
             draw()
         End Sub
-        ''' <summary>
-        ''' Automatically registers this class to TickHelper.
-        ''' </summary>
         Private Shared Sub RegisterToTick()
             If registeredInTick Then Return
             TickHelper.Add_Internal(AddressOf internalTick)
             registeredInTick = True
         End Sub
-        ''' <summary>
-        ''' Automatically unregisters this class from TickHelper.
-        ''' </summary>
         Private Shared Sub UnregisterFromTick()
             If Not registeredInTick Then Return
             TickHelper.Remove_Internal(AddressOf internalTick)
             registeredInTick = False
         End Sub
-    End Class
-    Private Class Cutscenes
 
+        '=========================================================================================================================================================================
+        '===============================================================================================================================================================================================================
     End Class
-    ''' <summary>
-    ''' Not fully tested.
-    ''' Can be used to draw any game texture. You have to call TickHelper.ProcessAll
-    ''' in a Tick to set the display duration (must be more than 5). 
-    ''' Otherwise you can manually call on a Tick.
-    ''' </summary>
-    Public Class GameTexture
+
+    Public NotInheritable Class GameTexture
         Private _txdHandle As Integer
         Private _textureHandle As Integer
+        Private ReadOnly _txd As String
+        Private ReadOnly _texture As String
         Private _streamed As Boolean
+        Private _isLoaded As Boolean
+        Private _streamRequestIssued As Boolean = False
+        Private _res As (X As Integer, Y As Integer) = (X:=0, Y:=0)
+        Private _asp As Single = 0.0F
+        Public Sub New(TXD As String, Texture As String, Optional StreamedTXD As Boolean = False)
+            If String.IsNullOrWhiteSpace(TXD) Then
+                Throw New ArgumentException("TXD cannot be null or empty.", NameOf(TXD))
+            End If
+            If String.IsNullOrWhiteSpace(Texture) Then
+                Throw New ArgumentException("Texture cannot be null or empty.", NameOf(Texture))
+            End If
+            _txd = TXD
+            _texture = Texture
+            _streamed = StreamedTXD
+        End Sub
 
-        Public ReadOnly Property TXD As String
-        Public ReadOnly Property Texture As String
-        Public ReadOnly Property TXDHandler As Integer
+        Public ReadOnly Property Aspect As Single
             Get
-                Return _txdHandle
+                If _res.X <= 0 OrElse _res.Y <= 0 Then
+                    Tools.WriteLog("Error: GameTexture ' " & _texture & " ' never loaded before. Cannot return Aspect.")
+                    Return Nothing
+                    Exit Property
+                End If
+                Return _asp
             End Get
         End Property
-        Public ReadOnly Property TextureHandler As Integer
+        ''' <summary>
+        ''' Userful only for raw native coding.
+        ''' </summary>
+        ''' <returns>Handle got from GET_TEXTURE or GET_TEXTURE_FROM_STREAMED_TXD</returns>
+        Public ReadOnly Property Handle As Integer
             Get
                 Return _textureHandle
             End Get
         End Property
-        Public ReadOnly Property StreamedTXD As Boolean
+        Public ReadOnly Property IsLoaded As Boolean
             Get
-                Return _streamed
+                Return _isLoaded
             End Get
         End Property
-        Public Property IsLoaded As Boolean
-        Public Sub New(TXD As String, Texture As String, Optional StreamedTXD As Boolean = False)
-            Me.TXD = TXD
-            Me.Texture = Texture
-            _streamed = StreamedTXD
-        End Sub
-        Public Sub Load()
-            If IsLoaded Then Exit Sub
+        Public ReadOnly Property Resolution As (X As Integer, Y As Integer)
+            Get
+                If _res.X <= 0 OrElse _res.Y <= 0 Then
+                    Tools.WriteLog("Error: GameTexture ' " & _texture & " ' never loaded before. Cannot return Resolution.")
+                    Return (X:=0, Y:=0)
+                    Exit Property
+                End If
+                Return _res
+            End Get
+        End Property
+        Public ReadOnly Property TXD As String
+            Get
+                Return _txd
+            End Get
+        End Property
+        Public Function Load() As Boolean
+            If _isLoaded Then Return True
 
             If _streamed Then
-                [Call]("REQUEST_STREAMED_TXD", TXD, True)
+                If Not _streamRequestIssued Then
+                    [Call]("REQUEST_STREAMED_TXD", _txd, True)
+                    _streamRequestIssued = True
+                End If
+                If Not [Call](Of Boolean)("HAS_STREAMED_TXD_LOADED", _txd) Then Return False
+                _textureHandle = [Call](Of Integer)("GET_TEXTURE_FROM_STREAMED_TXD", _txd, _texture)
+                If _textureHandle = 0 Then Return False
             Else
-                _txdHandle = [Call](Of Integer)("LOAD_TXD", TXD)
+                If _txdHandle = 0 Then
+                    _txdHandle = [Call](Of Integer)("LOAD_TXD", _txd)
+                End If
+
+                If _txdHandle = 0 Then Return False
+
+                _textureHandle = [Call](Of Integer)("GET_TEXTURE", _txdHandle, _texture)
+                If _textureHandle = 0 Then Return False
             End If
 
-            _textureHandle = [Call](Of Integer)("GET_TEXTURE", _txdHandle, Texture)
+            If _res.X = 0 AndAlso _res.Y = 0 Then
+                Dim p1, p2 As New Native.Pointer(GetType(Integer))
+                [Call]("GET_TEXTURE_RESOLUTION", _textureHandle, p1, p2)
+                _res.X = p1.Value
+                _res.Y = p2.Value
+                _asp = _res.X / _res.Y
+            End If
 
-            IsLoaded = True
+            _isLoaded = True
+            Return True
+        End Function
+        ''' <summary>
+        ''' Automatically loads TXD and texture if required.
+        ''' </summary>
+        ''' <param name="Position"></param>
+        ''' <param name="Size"></param>
+        ''' <param name="Rotation"></param>
+        ''' <param name="Color"></param>
+        Public Sub Draw(Position As Vector2, Size As Vector2, Rotation As Single, Color As ColorRGBA)
+            If Not _isLoaded AndAlso Not Load() Then
+                Return
+            End If
+            [Call]("DRAW_SPRITE", _textureHandle, Position.X, Position.Y, Size.X, Size.Y, Rotation, Color.Red, Color.Green, Color.Blue, Color.Alpha)
         End Sub
-        Public Sub Draw(pos As Vector2, size As Vector2, rotation As Single, color As ColorRGBA, Optional duration As Integer = 1)
-            If Not IsLoaded Then Load()
-
-            [Call]("DRAW_SPRITE", TXD, Texture, pos.X, pos.Y, size.X, size.Y, rotation, color.Red, color.Green, color.Blue, color.Alpha)
-        End Sub
-        Public Sub Release(Optional releaseTXD As Boolean = True)
+        Public Sub Release(Optional ReleaseTXD As Boolean = False)
             If _textureHandle <> 0 Then
                 [Call]("RELEASE_TEXTURE", _textureHandle)
                 _textureHandle = 0
             End If
 
-            If releaseTXD Then
+            If ReleaseTXD Then
                 If _streamed Then
-                    [Call]("MARK_STREAMED_TXD_AS_NO_LONGER_NEEDED", TXD)
-                Else
-                    If _txdHandle <> 0 Then
-                        [Call]("REMOVE_TXD", _txdHandle)
-                    End If
+                    [Call]("MARK_STREAMED_TXD_AS_NO_LONGER_NEEDED", _txd)
+                    _streamRequestIssued = False
+                ElseIf _txdHandle <> 0 Then
+                    [Call]("REMOVE_TXD", _txdHandle)
                 End If
+                _txdHandle = 0
             End If
 
-            _txdHandle = 0
-            IsLoaded = False
+            _isLoaded = False
         End Sub
+        'Public ReadOnly Property Texture As String
+        '    Get
+        '        Return _Texture
+        '    End Get
+        'End Property
+        'Public ReadOnly Property TXDHandle As Integer
+        '    Get
+        '        Return _txdHandle
+        '    End Get
+        'End Property
+        'Public ReadOnly Property StreamedTXD As Boolean
+        '    Get
+        '        Return _streamed
+        '    End Get
+        'End Property
+        Public Overrides Function ToString() As String
+            Return _texture
+        End Function
     End Class
-    Public Class GXT
+
+    Public NotInheritable Class GXT
+        '(DOES_TEXT_LABEL_EXIST( sParam1 )
+        'GET_LENGTH_OF_STRING_WITH_THIS_TEXT_LABEL( sParam1 )
+        'IS_STRING_NULL( sParam1 )
+        ''' <summary>
+        ''' Clears all big print (printing blank string for all types).
+        ''' </summary>
+        Public Shared Sub ClearAllBigPrints()
+            Dim i As Integer
+            For i = 1 To 7
+                [Call]("PRINT_BIG", "STRING", 1, i)
+            Next
+        End Sub
+        ''' <summary>
+        ''' Clears a specified GXT big print.
+        ''' </summary>
+        Public Shared Sub ClearBigPrint(GxtEntry As String)
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.ClearThisBigPrint: " & GxtEntry & " is not valid.")
+                Return
+            End If
+            [Call]("CLEAR_THIS_BIG_PRINT", GxtEntry)
+        End Sub
+        ''' <summary>
+        ''' Clears a specified big print type (printing blank string).
+        ''' </summary>
+        ''' <param name="Type">A native value from BigPrintType enum.</param>
+        Public Shared Sub ClearBigPrintType(Type As BigPrintType)
+            [Call]("PRINT_BIG", "STRING", 1, Type)
+        End Sub
+        Public Shared Sub ClearHelp()
+            [Call]("CLEAR_HELP")
+        End Sub
+
+        Public Shared Sub EnableNonMinigameHelpMessages(Optional Enable As Boolean = True)
+            [Call]("DISPLAY_NON_MINIGAME_HELP_MESSAGES", Enable)
+        End Sub
+        ''' <summary>
+        ''' Displays a native GXT text at the specified screen position.
+        ''' If Duration is at least 5 milliseconds, the text is managed by
+        ''' DrawManager and remains visible for the requested duration.
+        ''' Shorter durations draw the text immediately.
+        ''' Returns the native text width, single-line height and line count.
+        ''' </summary>
+        ''' <param name="GxtEntry">The GXT label to display.</param>
+        ''' <param name="PercentagePos">The normalized screen position.</param>
+        ''' <param name="Style">Optional native text style.</param>
+        ''' <param name="Duration">Display duration in milliseconds.</param>
+        Public Shared Function Draw(GxtEntry As String, PercentagePos As Vector2, Optional Style As TextStyle = Nothing, Optional Duration As Integer = 1, Optional LineHeightMultiplier As Single = 1.0F) As (Width As Single, Height As Single, LineCount As Integer)
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.Draw: " & GxtEntry & " is not valid.")
+                Return (0.0F, 0.0F, 0)
+            End If
+            Dim FinalStyle As TextStyle = If(Style, TextStyle.Default)
+
+            Dim FinalMultiplier As Single =
+    ClampFloat(LineHeightMultiplier, 0.7F, 10.0F)
+
+            Dim NativeWrap As (
+    StartPos As Single?,
+    EndPos As Single?,
+    LineHeightMultiplier As Single?
+) = (
+    StartPos:=0.0F,
+    EndPos:=1.0F,
+    LineHeightMultiplier:=FinalMultiplier)
+
+            Dim SingleLineHeight As Single =
+    TextStyle.SetTextStyle(FinalStyle, NativeWrap)
+
+            Dim StringWidth As Single =
+    [Call](Of Single)("GET_STRING_WIDTH", GxtEntry)
+
+            Dim NumberOfLines As Integer = 0
+
+            If Not String.IsNullOrEmpty(GxtEntry) Then
+
+                NumberOfLines = [Call](Of Integer)(
+        "GET_NUMBER_LINES",
+        0.0F,
+        1.0F,
+        GxtEntry)
+
+                NumberOfLines = Math.Max(1, NumberOfLines)
+
+            End If
+
+            Dim TotalHeight As Single =
+    CSng(NumberOfLines) *
+    SingleLineHeight *
+    FinalMultiplier
+            Dim BackgroundSize As New Vector2(0.0F, 0.0F)
+            Dim BackgroundPosition As Vector2? = Nothing
+
+            If FinalStyle.Background.Alpha > 0 AndAlso NumberOfLines > 0 Then
+
+                Dim BackgroundWidth As Single
+
+                If FinalStyle.Justification = NativeDraws.Justification.Justify Then
+
+                    BackgroundWidth = 1.0F
+
+                Else
+
+                    BackgroundWidth = Math.Min(
+            Math.Max(0.0F, StringWidth),
+            1.0F)
+
+                End If
+
+                BackgroundSize = New Vector2(
+        BackgroundWidth + (BackgroundHorizontalPadding * 2.0F),
+        TotalHeight + (BackgroundVerticalPadding * 2.0F))
+
+                If BackgroundSize.X > 0.0F Then
+
+                    BackgroundPosition = CalculateTextBackgroundPosition(
+            PercentagePos,
+            BackgroundSize,
+            FinalStyle.Justification,
+            0.0F,
+            1.0F,
+            HorizontalPadding:=BackgroundHorizontalPadding)
+
+                End If
+
+            End If
+            If Duration < 5 Then
+                If BackgroundPosition.HasValue Then
+                    DrawRectangle(
+        BackgroundPosition.Value,
+        BackgroundSize,
+        FinalStyle.Background,
+        Duration:=1)
+                End If
+
+                TextStyle.SetTextStyle(FinalStyle, NativeWrap)
+                [Call]("DISPLAY_TEXT", PercentagePos.X, PercentagePos.Y, GxtEntry)
+            Else
+
+                DrawManager.DrawGxtText(
+        GxtEntry,
+        Duration,
+        PercentagePos,
+        FinalStyle,
+        BackgroundSize,
+        BackgroundPosition,
+        FinalMultiplier)
+
+            End If
+
+            Return (Width:=StringWidth, Height:=TotalHeight, LineCount:=NumberOfLines)
+        End Function
+        ''' <summary>
+        ''' Displays a GXT text (subtitle).
+        ''' </summary>
+        Public Shared Sub Display(GxtEntry As String, Optional Duration As Integer = 3000, Optional BriefDisplay As Boolean = False, Optional DisplayNow As Boolean = True)
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.Display: " & GxtEntry & " is not valid.")
+                Return
+            End If
+            [Call]("ADD_NEXT_MESSAGE_TO_PREVIOUS_BRIEFS", BriefDisplay)
+            If Duration < 5 Then Duration = 5
+            If DisplayNow Then
+                [Call]("PRINT_NOW", GxtEntry, Duration)
+            Else
+                [Call]("PRINT", GxtEntry, Duration)
+            End If
+        End Sub
         ''' <summary>
         ''' Displays a GXT text with Input Text (bottom-left corner). Must be used in a tick (cycle).
         ''' You can display two or more lines contemporarily.
         ''' </summary>
         ''' <param name="TextKey">A string from TextKeys structure.</param>
-        Public Shared Sub Draw_InputHelperText(GXT_Table As String, GXT_Entry As String, TextKey As String, OnTheSameLine As Boolean, Optional Unknown As UInteger = 1)
-            [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, Unknown)
-            [Call]("DRAW_FRONTEND_HELPER_TEXT", GXT_Entry, TextKey, Not OnTheSameLine)
-        End Sub
-        ''' <summary>
-        ''' Displays a GXT text. Must be used in a tick (cycle).
-        ''' </summary>
-        Public Shared Sub Print(PercentagePos As Vector2, GXT_Table As String, GXT_Entry As String, Optional Unknown As Integer = 1)
-            [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, Unknown)
-            [Call]("DISPLAY_TEXT", PercentagePos.X, PercentagePos.Y, GXT_Entry)
-        End Sub
-        ''' <summary>
-        ''' Displays a GXT text with additional Float value. Must be used in a tick (cycle).
-        ''' </summary>
-        Public Shared Sub Print_WithAdditionalFloat(PercentagePos As Vector2, GXT_Table As String, GXT_Entry As String, Float As Single, DecimalToShow As Integer)
-            [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, 1)
-            [Call]("DISPLAY_TEXT_WITH_FLOAT", PercentagePos.X, PercentagePos.Y, GXT_Entry, Float, DecimalToShow)
-        End Sub
-        ''' <summary>
-        ''' Displays a GXT text with additional numbers. Must be used in a tick (cycle).
-        ''' </summary>
-        ''' <param name="NumbersCount_1_to_3"></param>
-        Public Shared Sub Print_WithAdditionalNumbers(PercentagePos As Vector2, GXT_Table As String, GXT_Entry As String, NumbersCount_1_to_3 As Integer, Number1 As Integer, Optional Number2 As Integer = 0, Optional Number3 As Integer = 0)
-            [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, 1)
-            Select Case NumbersCount_1_to_3
-                Case 1
-                    [Call]("DISPLAY_TEXT_WITH_NUMBER", PercentagePos.X, PercentagePos.Y, GXT_Entry, Number1)
-                Case 2
-                    [Call]("DISPLAY_TEXT_WITH_2_NUMBERS", PercentagePos.X, PercentagePos.Y, GXT_Entry, Number1, Number2)
-                Case 3
-                    [Call]("DISPLAY_TEXT_WITH_3_NUMBERS", PercentagePos.X, PercentagePos.Y, GXT_Entry, Number1, Number2, Number2)
-                Case Else
-                    Exit Sub
-            End Select
-        End Sub
-        ''' <summary>
-        ''' Displays a GXT text with additional string. Must be used in a tick (cycle).
-        ''' </summary>
-        ''' <param name="LiteralString">True if you want to add a string from GXT, False if you want to add a custom string</param>
-        Public Shared Sub Print_WithAdditionalString(PercentagePos As Vector2, GXT_Table As String, GXT_Entry As String, AdditionalString As String, Optional LiteralString As Boolean = True)
-            [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, 1)
-            '  If String2 = "" Then
-            If LiteralString Then
-                [Call]("DISPLAY_TEXT_WITH_LITERAL_STRING", PercentagePos.X, PercentagePos.Y, GXT_Entry, AdditionalString)
-            Else
-                [Call]("DISPLAY_TEXT_WITH_STRING", PercentagePos.X, PercentagePos.Y, GXT_Entry, AdditionalString)
+        Public Shared Sub DisplayInputHelper(GxtEntry As String, TextKey As String, OnTheSameLine As Boolean)
+            'aggiungere metodo che rimuove "~" da TextKey
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.DisplayInputHelper: " & GxtEntry & " is not valid.")
+                Return
             End If
-            'Else
-            '    If LiteralStrings Then
-            '        [Call]("DISPLAY_TEXT_WITH_TWO_STRINGS", PercentagePos.X, PercentagePos.Y, GXT_Entry, String1)
-            '    Else
-            '        [Call]("DISPLAY_TEXT_WITH_TWO_LITERAL_STRINGS", PercentagePos.X, PercentagePos.Y, GXT_Entry, String1)
-            '    End If
-            ' End If
+            Dim FinalTextKey As String = If(TextKey, String.Empty).Replace("~", String.Empty)
+            [Call]("DRAW_FRONTEND_HELPER_TEXT", GxtEntry, FinalTextKey, Not OnTheSameLine)
         End Sub
-        Public Class HelpMessage
-            Public Shared Sub Clear()
-                [Call]("CLEAR_HELP")
-            End Sub
-            Public Shared Sub EnableNonMinigameHelpMessages(Optional Enable As Boolean = True)
-                [Call]("DISPLAY_NON_MINIGAME_HELP_MESSAGES", Enable)
-            End Sub
-            Public Shared Function GetMessageBoxSize() As GTA.Vector2
-                Dim pointer1, pointer2 As Native.Pointer
-                pointer1 = New Native.Pointer(GetType(Single))
-                pointer2 = New Native.Pointer(GetType(Single))
-                [Call]("GET_HELP_MESSAGE_BOX_SIZE", pointer1, pointer2)
-                Return New GTA.Vector2(pointer1.Value, pointer2.Value)
-            End Function
-            Public Shared Sub Hide_ThisFrame()
-                [Call]("HIDE_HELP_TEXT_THIS_FRAME")
-            End Sub
-            Public Shared Sub InitFrontedHelperText()
-                [Call]("INIT_FRONTEND_HELPER_TEXT")
-            End Sub
-            Public Shared Function isPrintingAnyHelp() As Boolean
-                Return [Call](Of Boolean)("IS_HELP_MESSAGE_BEING_DISPLAYED")
-            End Function
-            Public Shared Function isPrintingHelp(GXT_Entry As String) As Boolean
-                Return [Call](Of Boolean)("IS_THIS_HELP_MESSAGE_BEING_DISPLAYED", GXT_Entry)
-            End Function
-            Public Shared Function isPrintingHelp_WithNumber(GXT_Entry As String, Number As Integer) As Boolean
-                Return [Call](Of Boolean)("IS_THIS_HELP_MESSAGE_WITH_NUMBER_BEING_DISPLAYED", GXT_Entry, Number)
-            End Function
-            Public Shared Function isPrintingHelp_WithString(GXT_Entry As String, AdditionalString As String) As Boolean
-                Return [Call](Of Boolean)("IS_THIS_HELP_MESSAGE_WITH_STRING_BEING_DISPLAYED", GXT_Entry, AdditionalString)
-            End Function
-            Public Shared Sub Print(GXT_Table As String, GXT_Entry As String, Optional PrintForever As Boolean = False)
-                [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, 1)
-                If Not PrintForever Then
-                    [Call]("PRINT_HELP", GXT_Entry)
-                Else
-                    [Call]("PRINT_HELP_FOREVER", GXT_Entry)
+        ''' <summary>
+        ''' Returns true if GxtEntry exists in any GXT table. Yet added inside every GXT and HelpMessage function.
+        ''' </summary>
+        Public Shared Function Exists(GxtEntry As String) As Boolean
+            Return [Call](Of Boolean)("DOES_TEXT_LABEL_EXIST", GxtEntry)
+        End Function
+        Public Shared Function GetHelpMessageBoxSize() As GTA.Vector2
+            Dim pointer1, pointer2 As Native.Pointer
+            pointer1 = New Native.Pointer(GetType(Single))
+            pointer2 = New Native.Pointer(GetType(Single))
+            [Call]("GET_HELP_MESSAGE_BOX_SIZE", pointer1, pointer2)
+            Return New GTA.Vector2(pointer1.Value, pointer2.Value)
+        End Function
+        Public Shared Function GetString(GxtEntry As String) As String
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.GetString: " & GxtEntry & " is not valid.")
+                Return "GxtEntry is not valid!"
+            End If
+            Return [Call](Of String)("GET_STRING_FROM_TEXT_FILE", GxtEntry)
+        End Function
+        Public Shared Function GetStringLength(GxtEntry As String) As Integer
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.GetStringLength: " & GxtEntry & " is not valid.")
+                Return 0
+            End If
+            Return [Call](Of Integer)("GET_LENGTH_OF_STRING_WITH_THIS_TEXT_LABEL", GxtEntry)
+        End Function
+        Public Shared Function GetFirstCharacters(GxtEntry As String, NumberOfCharacters As Integer) As String
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.GetFirstCharacters: " & GxtEntry & " is not valid.")
+                Return "GxtEntry is not valid!"
+            End If
+            Return [Call](Of String)("GET_FIRST_N_CHARACTERS_OF_STRING", GxtEntry, NumberOfCharacters)
+        End Function
+        Public Shared Sub HideHelpThisFrame()
+            [Call]("HIDE_HELP_TEXT_THIS_FRAME")
+        End Sub
+        ''' <summary>
+        ''' Untested. Maybe linked to DisplayInputHelper.w
+        ''' </summary>
+        Public Shared Sub InitFrontendHelperText()
+            [Call]("INIT_FRONTEND_HELPER_TEXT")
+        End Sub
+        Public Shared Function IsPrintingAnyHelp() As Boolean
+            Return [Call](Of Boolean)("IS_HELP_MESSAGE_BEING_DISPLAYED")
+        End Function
+        'TESTARE AdditionalGxtEntry
+        ''' <summary>
+        ''' Returns true if GxtEntry (with optional AdditionalGxtEntry) is being printed.
+        ''' If AdditionalGxtEntry = nothing, will be checked also help message with "STRING" additional string
+        ''' (needed for printing help without sound).
+        ''' </summary>
+        Public Shared Function IsPrintingHelp(GxtEntry As String, Optional AdditionalGxtEntry As String = Nothing) As Boolean
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.HelpMessage.IsPrintingHelp: " & GxtEntry & " is not valid.")
+                Return False
+            End If
+            'TESTARE
+            If AdditionalGxtEntry <> Nothing Then
+                If Not Exists(AdditionalGxtEntry) Then
+                    Tools.WriteLog("Error in NativeDraws.GXT.HelpMessage.IsPrintingHelp: " & AdditionalGxtEntry & " is not valid.")
+                    Return False
                 End If
-            End Sub
-            Public Shared Sub Print_ThisFrame(GXT_Table As String, GXT_Entry As String, Optional Unknown As Boolean = False)
-                [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, 1)
-                [Call]("DISPLAY_HELP_TEXT_THIS_FRAME", GXT_Entry, Unknown)
-            End Sub
-            Public Shared Sub Print_WithAdditionalNumber(GXT_Table As String, GXT_Entry As String, AdditionalNumber As Integer, Optional PrintForever As Boolean = False)
-                [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, 1)
-                If Not PrintForever Then
-                    [Call]("PRINT_HELP_WITH_NUMBER", GXT_Entry, AdditionalNumber)
-                Else
-                    [Call]("PRINT_HELP_FOREVER_WITH_NUMBER", GXT_Entry, AdditionalNumber)
+                Return [Call](Of Boolean)("IS_THIS_HELP_MESSAGE_WITH_STRING_BEING_DISPLAYED", GxtEntry, AdditionalGxtEntry)
+            End If
+            Return [Call](Of Boolean)("IS_THIS_HELP_MESSAGE_BEING_DISPLAYED", GxtEntry) OrElse
+                       [Call](Of Boolean)("IS_THIS_HELP_MESSAGE_WITH_STRING_BEING_DISPLAYED", GxtEntry, "STRING") 'check for printing with no sound and without additional string
+        End Function
+        'TESTARE
+        Public Shared Function IsPrintingHelpWithNumber(GxtEntry As String, Number As Integer) As Boolean
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.HelpMessage.IsPrintingHelpWithNumber: " & GxtEntry & " is not valid.")
+                Return False
+            End If
+            Return [Call](Of Boolean)("IS_THIS_HELP_MESSAGE_WITH_NUMBER_BEING_DISPLAYED", GxtEntry, Number)
+        End Function
+        ''' <summary>
+        ''' Displays a native GXT message at a fixed PrintBig position.
+        ''' By default, cancels any active or queued custom PrintBigText
+        ''' messages of the same type before displaying the native message.
+        ''' </summary>
+        ''' <param name="GxtEntry">The native GXT label.</param>
+        ''' <param name="Duration">Native display duration in milliseconds.</param>
+        ''' <param name="Type">The native PrintBig type.</param>
+        ''' <param name="DisplayNow">If True, removes custom PrintBigText messages of the same type before displaying the native message.
+        ''' </param>
+        Public Shared Sub PrintBig(GxtEntry As String, Optional Duration As Integer = 5000, Optional Type As BigPrintType = BigPrintType.Center_Standard, Optional DisplayNow As Boolean = True)
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.PrintBig: " & GxtEntry & " is not valid.")
+                Return
+            End If
+            If DisplayNow Then
+                DrawManager.ClearBigPrintText(Type)
+            End If
+            [Call]("PRINT_BIG", GxtEntry, Duration, Type)
+        End Sub
+        ''' <summary>
+        ''' Displays a number using a native PrintBig position.
+        ''' By default, cancels active or queued custom PrintBigText
+        ''' messages of the same type before displaying the native message.
+        ''' </summary>
+        ''' <param name="Number">The number to display.</param>
+        ''' <param name="Duration">Native display duration in milliseconds.</param>
+        ''' <param name="Type">The native PrintBig type.</param>
+        ''' <param name="DisplayNow">If True, removes custom PrintBigText messages of the same type before displaying the native message.
+        ''' </param>
+        Public Shared Sub PrintBigNumber(Number As Integer, Optional Duration As Integer = 5000, Optional Type As BigPrintType = BigPrintType.Center_Standard, Optional DisplayNow As Boolean = True)
+            If DisplayNow Then
+                DrawManager.ClearBigPrintText(Type)
+            End If
+            [Call]("PRINT_WITH_NUMBER_BIG", "NUMBER", Number, Duration, Type)
+        End Sub
+        ''' <summary>
+        ''' Print GXT help message with optional flags and additional string.
+        ''' </summary>
+        ''' <param name="GxtEntry"></param>
+        ''' <param name="PrintForever"></param>
+        ''' <param name="NoSound">If true it will be used "STRING" as additional string due to missing native. 
+        ''' It will be checked in IsPrintingHelpe so it won't cause any issue.</param>
+        ''' <param name="AdditionalGxtEntry">Note: not every GxtEntry support additional string (it will be displayed only the main one).</param>
+        Public Shared Sub PrintHelp(GxtEntry As String, Optional PrintForever As Boolean = False, Optional NoSound As Boolean = False, Optional BriefDisplay As Boolean = True, Optional AdditionalGxtEntry As String = Nothing)
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.HelpMessage.Print: " & GxtEntry & " is not valid.")
+                Return
+            End If
+            If AdditionalGxtEntry <> Nothing Then
+                If AdditionalGxtEntry <> "STRING" AndAlso Not Exists(AdditionalGxtEntry) Then
+                    Tools.WriteLog("Error in NativeDraws.GXT.HelpMessage.Print: " & AdditionalGxtEntry & " is not valid.")
+                    Return
                 End If
-            End Sub
-            Public Shared Sub Print_WithAdditionalString(GXT_Table As String, GXT_Entry As String, AdditionalString_GXT As String, Optional PrintForever As Boolean = False, Optional NoSound As Boolean = False)
-                [Call]("LOAD_ADDITIONAL_TEXT", GXT_Table, 1)
-                If Not PrintForever Then
-                    [Call]("PRINT_HELP_WITH_STRING", GXT_Entry, AdditionalString_GXT)
-                Else
-                    If Not NoSound Then
-                        [Call]("PRINT_HELP_FOREVER_WITH_STRING", GXT_Entry, AdditionalString_GXT)
+            Else
+                If AdditionalGxtEntry = Nothing Then AdditionalGxtEntry = "STRING"
+            End If
+
+            [Call]("ADD_NEXT_MESSAGE_TO_PREVIOUS_BRIEFS", BriefDisplay)
+            If Not PrintForever Then
+                If Not NoSound Then
+                    If AdditionalGxtEntry = "STRING" Then
+                        [Call]("PRINT_HELP", GxtEntry)
                     Else
-                        [Call]("PRINT_HELP_FOREVER_WITH_STRING_NO_SOUND", GXT_Entry, AdditionalString_GXT)
+                        [Call]("PRINT_HELP_WITH_STRING", GxtEntry, AdditionalGxtEntry)
                     End If
+                Else
+                    [Call]("PRINT_HELP_WITH_STRING_NO_SOUND", GxtEntry, AdditionalGxtEntry)
                 End If
-            End Sub
-            'Public Shared Sub SetMessageBoxSize(Size As Single)
-            '    [Call]("SET_HELP_MESSAGE_BOX_SIZE", value unknown type)
-            'End Sub
-        End Class
+            Else
+                If Not NoSound Then
+                    If AdditionalGxtEntry = "STRING" Then
+                        [Call]("PRINT_HELP_FOREVER", GxtEntry)
+                    Else
+                        [Call]("PRINT_HELP_FOREVER_WITH_STRING", GxtEntry, AdditionalGxtEntry)
+                    End If
+                Else
+                    [Call]("PRINT_HELP_FOREVER_WITH_STRING_NO_SOUND", GxtEntry, AdditionalGxtEntry)
+                End If
+            End If
+        End Sub
+        ''' <param name="GxtEntry">Use "NUMBER" to display only the number.</param>
+        ''' <param name="Number">Note: not every GxtEntry support additional number (it won't be displayed anything).</param>
+        Public Shared Sub PrintHelpWithNumber(GxtEntry As String, Number As Integer, Optional PrintForever As Boolean = False, Optional BriefDisplay As Boolean = True)
+            If Not Exists(GxtEntry) Then
+                Tools.WriteLog("Error in NativeDraws.GXT.HelpMessage.PrintWithNumber: " & GxtEntry & " is not valid.")
+                Return
+            End If
+
+            [Call]("ADD_NEXT_MESSAGE_TO_PREVIOUS_BRIEFS", BriefDisplay)
+            If Not PrintForever Then
+                [Call]("PRINT_HELP_WITH_NUMBER", GxtEntry, Number)
+            Else
+                [Call]("PRINT_HELP_FOREVER_WITH_NUMBER", GxtEntry, Number)
+            End If
+        End Sub
+        'Public Shared Sub SetMessageBoxSize(Size As Single)
+        '    [Call]("SET_HELP_MESSAGE_BOX_SIZE", value unknown type)
+        'End Sub
+        ''' <summary>
+        ''' Loads a GXT table. Not required for many GXT entries, like "GO" and "NET_LOADING".
+        ''' </summary>
+        ''' <param name="Unknown">SCO scripts use 0, 3 and 6.</param>
+        Public Shared Sub Load(GxtTable As String, Optional Unknown As Integer = 1)
+            [Call]("LOAD_ADDITIONAL_TEXT", GxtTable, Unknown)
+        End Sub
     End Class
+
     'Public Class Lights
     '    Public Property Position As Vector3
     '    Public Property Color As ColorRGB
@@ -1005,60 +1937,46 @@ Public Class NativeDraws
     '        registeredTick = False
     '    End Sub
     'End Class
-    Public Class Movies
-        ' Private Shared _currMovie As String
-        Public Shared Sub Draw(PercentagePos As Vector2, PercentageSize As Vector2, Rotation As Single, Color As ColorRGBA)
-            [Call]("DRAW_MOVIE", PercentagePos.X, PercentagePos.Y, PercentageSize.X, PercentageSize.Y, Rotation, Color.Red, Color.Green, Color.Blue, Color.Alpha)
-        End Sub
-        Public Shared Sub Play()
-            [Call]("PLAY_MOVIE")
-        End Sub
-        Public Shared Sub Relase()
-            [Call]("RELASE_MOVIE")
-        End Sub
-        Public Shared WriteOnly Property CurrentMovie As String
-            Set(value As String)
-                [Call]("SET_CURRENT_MOVIE", value)
-            End Set
-        End Property
-        Public Shared WriteOnly Property Time As Single
-            Set(value As Single)
-                [Call]("SET_MOVIE_TIME", value)
-            End Set
-        End Property
-        Public Shared WriteOnly Property Volume As Single
-            Set(value As Single)
-                [Call]("SET_MOVIE_VOLUME", value)
-            End Set
-        End Property
-        Public Shared Sub [Stop](Optional Relase As Boolean = False)
-            [Call]("STOP_MOVIE")
-            If Relase Then [Call]("RELASE_MOVIE")
-        End Sub
+    ''' <summary>
+    ''' Untested.
+    ''' </summary>
+    Public NotInheritable Class Movie
+        Public Structure MoviesList
+            Public Shared Weazel As String = "" '"weazel""CNT""static""burgershot_nosound""static_nosound" 
+        End Structure
+        Private Sub New()
+            End Sub
+            ' Private Shared _currMovie As String
+            Public Shared Sub Draw(PercentagePos As Vector2, PercentageSize As Vector2, Rotation As Single, Color As ColorRGBA)
+                [Call]("DRAW_MOVIE", PercentagePos.X, PercentagePos.Y, PercentageSize.X, PercentageSize.Y, Rotation, Color.Red, Color.Green, Color.Blue, Color.Alpha)
+            End Sub
+            Public Shared Sub Play()
+                [Call]("PLAY_MOVIE")
+            End Sub
+            Public Shared Sub Release()
+                [Call]("RELEASE_MOVIE")
+            End Sub
+            Public Shared WriteOnly Property CurrentMovie As String
+                Set(value As String)
+                    [Call]("SET_CURRENT_MOVIE", value)
+                End Set
+            End Property
+            Public Shared WriteOnly Property Time As Single
+                Set(value As Single)
+                    [Call]("SET_MOVIE_TIME", value)
+                End Set
+            End Property
+            Public Shared WriteOnly Property Volume As Single
+                Set(value As Single)
+                    [Call]("SET_MOVIE_VOLUME", value)
+                End Set
+            End Property
+            Public Shared Sub [Stop](Optional Release As Boolean = False)
+                [Call]("STOP_MOVIE")
+                If Release Then [Call]("Release_MOVIE")
+            End Sub
     End Class
-    Public Class NativeFonts
-        Public Enum Fonts
-            Standard = 0
-            Dotted = 1
-            DottedAndGTAfont = 3
-            StandardAndDartHandwrite = 4
-            Large = 5
-            Narrow = 6
-        End Enum
-        Public Shared Sub Change(FontID As Fonts)
-            If Not [Call](Of Boolean)("IS_FONT_LOADED", FontID) Then [Call]("LOAD_TEXT_FONT", FontID)
-            [Call]("SET_TEXT_FONT", FontID)
-        End Sub
-        Public Shared Sub Reset()
-            [Call]("USE_PREVIOUS_FONT_SETTINGS")
-        End Sub
-        'Public Shared Function isFontLoaded(FontID As Fonts)
-        '    Return [Call](Of Boolean)("IS_FONT_LOADED", FontID)
-        'End Function
-        'Public Shared Sub Request(FontID As Fonts)
-        '    [Call]("LOAD_TEXT_FONT", FontID)
-        'End Sub
-    End Class
+
     Public Structure TextBlips
         Public Const Destination1 As String = "~BLIP_0~"
         Public Const Destination2 As String = "~BLIP_1~"
@@ -1156,6 +2074,7 @@ Public Class NativeDraws
         Public Const ArrowAbove As String = "~BLIP_93~"
         Public Const ArrowBelow As String = "~BLIP_94~"
     End Structure
+
     Public Structure TextColors
         Public Const Red As String = "~r~"
         Public Const Green As String = "~g~"
@@ -1189,16 +2108,19 @@ Public Class NativeDraws
         Public Const MP_Purple2 As String = "~COL_NET_16~"
 
         ' FX colors / special
-        Public Const FX_Unknown02 As String = "~n~"
+        Public Const FX_LineBreak As String = "~n~"
         Public Const FX_StopColorFxHere As String = "~s~"
         Public Const Fx_Highlighted As String = "~h~"
         Public Const Fx_String As String = "~a~"
-        Public Const Fx_Number As String = "~1~"
+        Public Const Fx_Unknown3 As String = "~1~"
         Public Const Fx_Subtitle As String = "~z~"
+        ''' <summary>Used after FX_Subtitle</summary>
+        Public Const FX_Unknown1 As String = "~x~"
         Public Const RockstarLogo As String = "¬"
         '  Public Shared FivePointStar As String = "^"
         'Public Shared FivePointStarSmall As String = "*"
     End Structure
+
     Public Structure TextKeys
         Public Const Action As String = "~INPUT_PICKUP~"
         Public Const Pickup As String = "~INPUT_PICKUP~"
@@ -1370,28 +2292,54 @@ Public Class NativeDraws
         Public Const Joypad_DpadDown As String = "~PAD_DPAD_DOWN~"
         Public Const Joypad_Back As String = "~PAD_BACK~"
     End Structure
-    Public Class TextStyle
+
+    Public NotInheritable Class TextStyle
         Private _Col As ColorRGBA
-        Private _cent As Boolean
-        Private _backgr As Boolean
-        ' Private _unders As Boolean
+        Private _justify As Justification
+        Private _font As Fonts
         Private _proport As Boolean
-        Private _size As Vector2
-        ' Private _shadowDist As Single
+        Private _nativeScale As Vector2
+        Private _sizeValue As Integer = 12
+        Private _widthScale As Single = 1.0F
+        Private _Background As ColorRGBA
+
+        Private Shared ReadOnly _FontBaseXCoef As New System.Collections.Generic.Dictionary(Of Fonts, Single) From {{Fonts.Standard, 0.56F},
+                                                                                                                    {Fonts.Helvetica, 0.56F},
+                                                                                                                    {Fonts.StandardUppercase_GtaNumbers, 0.56F},
+                                                                                                                    {Fonts.Dotted, 0.585F},
+                                                                                                                    {Fonts.Dotted_HandwriteNumbers, 0.585F},
+                                                                                                                    {Fonts.Narrow, 0.65F},
+                                                                                                                    {Fonts.HelveticaBold, 0.53F}}
+        '--------------------
         Private _ShadowEnabled As Boolean
-        Private _Bordertick As Integer
+        Private _Underscores As Boolean
         Private _BorderCol As ColorRGBA
-        'Private _textLimits As Vector2
-        Public Shared Property [Default] As New TextStyle(ColorRGBA.White, New Vector2(0.26, 0.26), False, ColorRGBA.Black)
-        Public Property Background As Boolean
-            Get
-                Return _backgr
-            End Get
-            Set(value As Boolean)
-                _backgr = value
-            End Set
-        End Property
-        ''' <summary>\
+        Private Const NativeLineHeightPerScaleY As Single = 0.066F
+        Public Shared Property [Default] As New TextStyle(ColorRGBA.White, Size:=12)
+        Public Enum Fonts
+            'None = -1
+            Standard = 0
+            ''' <summary>
+            ''' Only uppercase
+            ''' </summary>
+            Dotted = 1
+            StandardUppercase_GtaNumbers = 4
+            ''' <summary>
+            ''' Only uppercase
+            ''' </summary>
+            Dotted_HandwriteNumbers = 5
+            ''' <summary>
+            ''' Only uppercase
+            ''' </summary>
+            Narrow = 6
+            ''' <summary>This font will automatically call LOAD_TEXT_FONT</summary>
+            HelveticaBold = 7
+            ''' <summary>
+            ''' Only uppercase
+            ''' </summary>
+            Helvetica = 8
+        End Enum
+        ''' <summary>
         ''' If nothing the text will display without borders.
         ''' Uses the function SET_TEXT_EDGE
         ''' </summary>
@@ -1403,12 +2351,12 @@ Public Class NativeDraws
                 _BorderCol = value
             End Set
         End Property
-        Public Property Center As Boolean
+        Public Property Justification As Justification
             Get
-                Return _cent
+                Return _justify
             End Get
-            Set(value As Boolean)
-                _cent = value
+            Set(value As Justification)
+                _justify = value
             End Set
         End Property
         Public Property Color As ColorRGBA
@@ -1419,7 +2367,15 @@ Public Class NativeDraws
                 _Col = value
             End Set
         End Property
-        Public Property Proportional As Boolean
+        Public Property Shadow As Boolean
+            Get
+                Return _ShadowEnabled
+            End Get
+            Set(value As Boolean)
+                _ShadowEnabled = value
+            End Set
+        End Property
+        Private Property Proportional As Boolean
             Get
                 Return _proport
             End Get
@@ -1427,552 +2383,1907 @@ Public Class NativeDraws
                 _proport = value
             End Set
         End Property
-        Public Property Scale As Vector2
+        Public ReadOnly Property Scale As Vector2
             Get
-                Return _size
+                Return _nativeScale
             End Get
-            Set(value As Vector2)
-                _size = value
+        End Property
+        Public Property Size As Integer
+            Get
+                Return _sizeValue
+            End Get
+            Set(value As Integer)
+                If value < 1 Then value = 1
+                _sizeValue = value
+                UpdateNativeScale()
             End Set
         End Property
-        '''' <summary>
-        '''' Set distance and color of text's shadow.
-        '''' Uses the function SET_TEXT_DROPSHADOW
-        '''' </summary>
-        'Public Property Shadow As Boolean
-        '    Get
-        '        Return _ShadowEnabled
-        '    End Get
-        '    Set(value As Boolean)
-        '        _ShadowEnabled = value
-        '    End Set
-        'End Property
-        '''' <summary>
-        '''' Set the "box" where text will be drawn. If the text is longer, it will be
-        '''' display on many lines
-        '''' Uses the function SET_TEXT_WRAP
-        '''' </summary>
-        'Public Property TextBoxLimits As Vector2
-        '    Get
-        '        Return _textLimits
-        '    End Get
-        '    Set(value As Vector2)
-        '        _textLimits = value
-        '    End Set
-        'End Property
-        'Public Property Underscore As Boolean
-        '    Get
-        '        Return _unders
-        '    End Get
-        '    Set(value As Boolean)
-        '        _unders = value
-        '    End Set
-        'End Property
-        Public Sub New(Color As ColorRGBA, Scale As Vector2, Optional Center As Boolean = False, Optional BorderColor As ColorRGBA = Nothing,
-                       Optional Background As Boolean = False, Optional Proportional As Boolean = False)
+        Public Property WidthScale As Single
+            Get
+                Return _widthScale
+            End Get
+            Set(value As Single)
+                If value < 0.0F Then value = 0.0F
+                _widthScale = value
+                UpdateNativeScale()
+            End Set
+        End Property
+        Public Property Font As Fonts
+            Get
+                Return _font
+            End Get
+            Set(value As Fonts)
+                _font = value
+                UpdateNativeScale()
+            End Set
+        End Property
+        Public Property Background As ColorRGBA
+            Get
+                Return _Background
+            End Get
+            Set(value As ColorRGBA)
+                _Background = value
+            End Set
+        End Property
+        Public Property ShowUnderscores As Boolean
+            Get
+                Return _Underscores
+            End Get
+            Set(value As Boolean)
+                _Underscores = value
+            End Set
+        End Property
+        Private Sub New() : End Sub
+        ''' <param name="Justification">You need to set proper wrap length to use justify or right justification.</param>
+        Public Sub New(Color As ColorRGBA, Optional Size As Integer = 12, Optional Justification As Justification = Justification.Left, Optional BorderColor As ColorRGBA = Nothing, Optional Font As Fonts = Fonts.Standard,
+                       Optional Shadow As Boolean = False, Optional WidthScale As Single = 1.0F, Optional Background As ColorRGBA = Nothing, Optional Proportional As Boolean = False, Optional ShowUnderscores As Boolean = True)
+
             If Color = Nothing Then _Col = New ColorRGBA(255, 255, 255, 255) Else _Col = Color
-            _size = Scale
-            _cent = Center
-            '  If TextBoxLimits = Nothing Then _textLimits = New Vector2(0.99, 0.99) Else _textLimits = TextBoxLimits
-            '  _unders = Underscore
-            _Bordertick = 1.1
+            _font = Font
+            _justify = Justification
             _BorderCol = BorderColor
-            _backgr = Background
             _proport = Proportional
+            _ShadowEnabled = Shadow
+            If Size < 1 Then Size = 1
+            If WidthScale < 0.0F Then WidthScale = 0.0F
+            _sizeValue = Size
+            _widthScale = WidthScale
+            _Background = Background
+            _Underscores = ShowUnderscores
+            UpdateNativeScale()
         End Sub
-        Friend Shared Sub SetTextStyle(Style As TextStyle)
-            [Call]("SET_TEXT_SCALE", Style._size.X, Style._size.Y)
-            [Call]("SET_TEXT_BACKGROUND", Style._backgr)
-            [Call]("SET_TEXT_CENTRE", Style._cent)
-            [Call]("SET_TEXT_COLOUR", Style._Col.Red, Style._Col.Green, Style._Col.Blue, Style._Col.Alpha)
+        ''' <summary>
+        ''' Returns single line height (native).
+        ''' </summary>
+        ''' <returns></returns>
+        Friend Shared Function SetTextStyle(Style As TextStyle, Optional Wrap As (StartPos As Single?, EndPos As Single?, LineHeightMultiplier As Single?) = Nothing, Optional ViewportID As Integer? = Nothing, Optional RenderID As Integer? = Nothing) As Single
+            SyncLock _lockSettingStyle
+                Dim FinalStart As Single = If(Wrap.StartPos.HasValue, Wrap.StartPos.Value, 0.0F)
+                Dim FinalEnd As Single = If(Wrap.EndPos.HasValue, Wrap.EndPos.Value, 1.0F)
+                Dim FinalLineHeight As Single = If(Wrap.LineHeightMultiplier.HasValue, ClampFloat(Wrap.LineHeightMultiplier.Value, 0.7F, 10.0F), 1.0F)
+                '-----
+                If ViewportID.HasValue Then [Call]("SET_TEXT_VIEWPORT_ID", ViewportID.Value)
+                If RenderID.HasValue Then [Call]("SET_TEXT_RENDER_ID", RenderID.Value)
+                '-----
+                If Style.Font = Fonts.HelveticaBold AndAlso Not [Call](Of Boolean)("IS_FONT_LOADED", Style.Font) Then [Call]("LOAD_TEXT_FONT", Style.Font)
+                [Call]("SET_TEXT_FONT", Style.Font)
+                '-----
+                [Call]("SET_TEXT_SCALE", Style._nativeScale.X, Style._nativeScale.Y)
+                Dim SingleLineHeight As Single = Style._nativeScale.Y * NativeLineHeightPerScaleY
+                '-----
+                Dim RightJustify As Boolean
+                Dim Center As Boolean
+                Dim Justify As Boolean
+                Select Case Style._justify
+                    Case Justification.Left
+                        RightJustify = False
+                        Center = False
+                        Justify = False
+                    Case Justification.Center
+                        RightJustify = False
+                        Center = True
+                        Justify = False
+                    Case Justification.Right
+                        RightJustify = True
+                        Center = False
+                        Justify = False
+                    Case Justification.Justify
+                        RightJustify = False
+                        Center = False
+                        Justify = True
+                    Case Else
+                        RightJustify = False
+                        Center = False
+                        Justify = False
+                End Select
+                [Call]("SET_TEXT_RIGHT_JUSTIFY", RightJustify)
+                [Call]("SET_TEXT_CENTRE", Center)
+                [Call]("SET_TEXT_JUSTIFY", Justify)
+                '-----
+                [Call]("SET_TEXT_COLOUR", Style._Col.Red, Style._Col.Green, Style._Col.Blue, Style._Col.Alpha)
+                '-----
+                [Call]("SET_TEXT_DROPSHADOW", Style._ShadowEnabled, 0, 0, 0, 255)
+                '-----
+                Dim BorderEnabled As Boolean = (Style._BorderCol <> Nothing)
+                [Call]("SET_TEXT_EDGE", BorderEnabled, Style._BorderCol.Red, Style._BorderCol.Green, Style._BorderCol.Blue, Style._BorderCol.Alpha)
+                '-----
+                [Call]("SET_TEXT_PROPORTIONAL", Not Style._proport)
+                '-----
+                [Call]("SET_TEXT_USE_UNDERSCORE", Style._Underscores)
+                '-----
+                [Call]("SET_TEXT_WRAP", FinalStart, FinalEnd)
+                [Call]("SET_TEXT_LINE_HEIGHT_MULT", FinalLineHeight) 'Rimuovere per facilitare calcolo altezza linee?
+                Return SingleLineHeight
+            End SyncLock
+        End Function
+        Friend Function WithColor(NewColor As ColorRGBA) As TextStyle
+            If NewColor = Me.Color Then Return Me
+            Return New TextStyle(Color:=NewColor, Size:=Me.Size, Justification:=Me.Justification, BorderColor:=Me.Borders, Font:=Me.Font, Shadow:=Me.Shadow, WidthScale:=Me.WidthScale, Background:=Me.Background, Proportional:=Me._proport, ShowUnderscores:=Me._Underscores)
+        End Function
+        Friend Function WithFont(NewFont As Fonts) As TextStyle
 
-            'If Style._ShadowEnabled = False Then
-            '    [Call]("SET_TEXT_DROPSHADOW", 0, 0, 0, 0, 0)
-            'Else
-            '    [Call]("SET_TEXT_DROPSHADOW", 0, 0, 0, 0, 255)
-            'End If
-
-            If Style._BorderCol <> Nothing Then
-                [Call]("SET_TEXT_EDGE", Style._Bordertick, Style._BorderCol.Red, Style._BorderCol.Green, Style._BorderCol.Blue, Style._BorderCol.Alpha)
-            Else
-                [Call]("SET_TEXT_EDGE", 0, 0, 0, 0, 0)
+            If NewFont = Me.Font Then
+                Return Me
             End If
-            [Call]("SET_TEXT_PROPORTIONAL", Not Style._proport)
-            '  [Call]("SET_TEXT_USE_UNDERSCORE", Not Style._unders)
-            ' [Call]("SET_TEXT_WRAP", Style._textLimits.X, Style._textLimits.Y)
-        End Sub
 
+            Return New TextStyle(
+        Color:=Me.Color,
+        Size:=Me.Size,
+        Justification:=Me.Justification,
+        BorderColor:=Me.Borders,
+        Font:=NewFont,
+        Shadow:=Me.Shadow,
+        WidthScale:=Me.WidthScale,
+        Background:=Me.Background,
+        Proportional:=Me._proport,
+        ShowUnderscores:=Me._Underscores)
+
+        End Function
+        Friend Function WithBackground(NewBackground As ColorRGBA) As TextStyle
+
+            If NewBackground = Me.Background Then Return Me
+
+            Return New TextStyle(
+        Color:=Me.Color,
+        Size:=Me.Size,
+        Justification:=Me.Justification,
+        BorderColor:=Me.Borders,
+        Font:=Me.Font,
+        Shadow:=Me.Shadow,
+        WidthScale:=Me.WidthScale,
+        Background:=NewBackground,
+        Proportional:=Me._proport,
+        ShowUnderscores:=Me._Underscores)
+
+        End Function
+        Friend Function Clone() As TextStyle
+
+            Return New TextStyle(
+        Color:=Me.Color,
+        Size:=Me.Size,
+        Justification:=Me.Justification,
+        BorderColor:=Me.Borders,
+        Font:=Me.Font,
+        Shadow:=Me.Shadow,
+        WidthScale:=Me.WidthScale,
+        Background:=Me.Background,
+        Proportional:=Me._proport,
+        ShowUnderscores:=Me._Underscores)
+
+        End Function
+        Private Shared Function GetFontBaseXCoef(Font As Fonts) As Single
+            Dim Coef As Single
+            If _FontBaseXCoef.TryGetValue(Font, Coef) AndAlso Coef > 0.0F Then Return Coef
+            Return 1.0F
+        End Function
+        Private Sub UpdateNativeScale()
+            _nativeScale.Y = _sizeValue / 50.0F
+            _nativeScale.X = _nativeScale.Y * GetFontBaseXCoef(_font) * _widthScale
+        End Sub
         Public Shared Operator =(Style1 As TextStyle, Style2 As TextStyle) As Boolean
             If ReferenceEquals(Style1, Style2) Then Return True
             If Style1 Is Nothing OrElse Style2 Is Nothing Then Return False
 
-            Return Style1._backgr = Style2._backgr AndAlso
-                Style1._Bordertick = Style2._Bordertick AndAlso
-                Style1._BorderCol = Style2._BorderCol AndAlso
-                Style1._cent = Style2._cent AndAlso
-                Style1._Col = Style2._Col AndAlso
-                Style1._proport = Style2._proport AndAlso
-                Style1._size = Style2._size 'AndAlso
-            'Style1._unders = Style2._unders ' AndAlso
-            ' Style1._textLimits = Style2._textLimits
-            'Style1._shadowDist = Style2._shadowDist AndAlso
+            Return ((Style1._BorderCol = Nothing AndAlso Style2._BorderCol = Nothing) OrElse
+                   (Style1._BorderCol <> Nothing AndAlso Style1._BorderCol.Equals(Style2._BorderCol))) AndAlso
+                   Style1._justify = Style2._justify AndAlso Style1._Col.Equals(Style2._Col) AndAlso
+                   Style1._proport = Style2._proport AndAlso Style1._nativeScale.Equals(Style2._nativeScale) AndAlso
+                   Style1._font = Style2._font AndAlso Style1._ShadowEnabled = Style2._ShadowEnabled AndAlso
+                   Style1._Background.Equals(Style2._Background) AndAlso Style1._sizeValue = Style2._sizeValue AndAlso
+                   Style1._widthScale.Equals(Style2._widthScale) AndAlso Style1._Underscores = Style2._Underscores
         End Operator
-
         Public Shared Operator <>(Style1 As TextStyle, Style2 As TextStyle) As Boolean
             Return Not (Style1 = Style2)
         End Operator
-        Public Overrides Function Equals(Style2 As Object) As Boolean
-            If ReferenceEquals(Me, Style2) Then Return True
-            If Style2 Is Nothing OrElse Style2.GetType() IsNot Me.GetType() Then Return False
+        Public Overrides Function Equals(Style As Object) As Boolean
+            If ReferenceEquals(Me, Style) Then Return True
+            If Style Is Nothing OrElse Style.GetType() IsNot Me.GetType() Then Return False
 
-            Dim other As TextStyle = CType(Style2, TextStyle)
+            Dim other As TextStyle = CType(Style, TextStyle)
 
-            Return _backgr = other._backgr AndAlso
-           _Bordertick = other._Bordertick AndAlso
-           _BorderCol.Equals(other._BorderCol) AndAlso
-           _cent = other._cent AndAlso
-           _Col.Equals(other._Col) AndAlso
-           _proport = other._proport AndAlso
-           _size.Equals(other._size) 'AndAlso
-            ' _unders = other._unders 'AndAlso
-            '  _textLimits.Equals(other._textLimits)
-            '  _shadowDist = other._shadowDist AndAlso
+            Return ((_BorderCol = Nothing AndAlso other._BorderCol = Nothing) OrElse
+                   (_BorderCol <> Nothing AndAlso _BorderCol.Equals(other._BorderCol))) AndAlso
+                   _justify = other._justify AndAlso _Col.Equals(other._Col) AndAlso
+                   _proport = other._proport AndAlso _nativeScale.Equals(other._nativeScale) AndAlso
+                   _font = other._font AndAlso _ShadowEnabled = other._ShadowEnabled AndAlso _Background.Equals(other._Background) AndAlso
+                   _sizeValue = other._sizeValue AndAlso _widthScale.Equals(other._widthScale) AndAlso _Underscores = other._Underscores
         End Function
-
+        Public Overrides Function GetHashCode() As Integer
+            Return _BorderCol.GetHashCode() Xor _justify.GetHashCode() Xor _Col.GetHashCode() Xor _proport.GetHashCode() Xor _nativeScale.GetHashCode() Xor _sizeValue.GetHashCode() Xor _widthScale.GetHashCode() Xor _font.GetHashCode() Xor _ShadowEnabled.GetHashCode() Xor _Underscores.GetHashCode() Xor _Background.GetHashCode()
+        End Function
         'SET_TEXT_DRAW_BEFORE_FADE
         'SET_TEXT_INPUT_ACTIVE
-        'SET_TEXT_JUSTIFY
         'SET_TEXT_LINE_DISPLAY
-        'SET_TEXT_LINE_HEIGHT_MULT
-        'SET_TEXT_RENDER_ID
-        'SET_TEXT_RIGHT_JUSTIFY
     End Class
 
-    '''' <summary>
-    '''' Helper class for easily drawing custom images on screen with normalized coordinates, rotation, color, and alpha.
-    '''' Includes fade in/out support, debug editing (move/resize/rotate), and saving configuration to file.
-    '''' </summary>
-    'Public Class CustomTexture
-
-    '    Private Shared ReadOnly activeImages As New List(Of CustomTexture)
-    '    Private Shared isTickAttached As Boolean = False
-
-    '    Private ReadOnly texture As Texture
-    '    Private pos As Vector2
-    '    Private _size As Vector2
-    '    Private rot As Single
-    '    Private color As ColorRGBA
-    '    Private alpha As Integer = 255
-
-    '    Private isVisible As Boolean = True
-    '    Private isFading As Boolean = False
-    '    Private fadeDirection As Integer = 0 ' 1 = in, -1 = out
-    '    Private fadeSpeed As Single = 1.0F
-
-    '    ' Debug mode
-    '    Private debugEnabled As Boolean = False
-    '    Private moveSpeed As Single = 0.002F
-    '    Private sizeSpeed As Single = 0.002F
-    '    Private rotateSpeed As Single = 1.0F
-    '    Private savePath As String
-    '    Public Shared Property DebugLogPath As String = "\NativeExtended-IV.log"
-
-    '    ''' <summary>
-    '    ''' Creates a new image helper with a given texture path.
-    '    ''' </summary>
-    '    Public Sub New(Path As String)
 
 
-    '        ' If DebugLogPath = "" Then DebugLogPath = Game.InstallFolder & "\NativeExtended-IV.log"
-
-    '        Me.texture = New Texture(Path)
-    '        activeImages.Add(Me)
-    '        AttachTick()
-    '    End Sub
-
-    '    '---------------------------------------------
-    '    ' 🔹 Draw
-    '    '---------------------------------------------
-    '    Public Sub Draw(Position As Vector2, Optional SizePercent As Vector2 = Nothing, Optional Color As ColorRGBA = Nothing)
-    '        If Not isVisible Then Return
-
-    '        If Color = Nothing Then Color = Color.White
-    '        If SizePercent = Nothing Then SizePercent = New Vector2(0.1F, 0.1F)
-    '        Me.pos = Position
-    '        Me._size = SizePercent
-    '        Me.Rotation = 0.0F
-    '        Me.color = Color
-
-    '        Dim screenRes As  = Game.Resolution
-    '        Dim pos As New Vector2(screenRes.Width * Position.X,
-    '                               screenRes.Height * Position.Y)
-    '        Dim sz As New SizeF(screenRes.Width * size.X,
-    '                            screenRes.Height * size.Y)
-
-    '        Dim drawColor As Color = Color.FromArgb(alpha, Color)
-    '        texture.Draw(pos, sz, Rotation, drawColor)
-
-    '        If debugEnabled Then
-    '            Game.DisplayText($"[DEBUG MODE]" & vbCrLf &
-    '                             $"Pos: X={Position.X:F3}, Y={Position.Y:F3}" & vbCrLf &
-    '                             $"Size: W={size.X:F3}, H={size.Y:F3}" & vbCrLf &
-    '                             $"Rot: {Rotation:F1}°",
-    '                             25)
-    '        End If
-    '    End Sub
-
-    '    '---------------------------------------------
-    '    ' 🔹 Fade-in / Fade-out
-    '    '---------------------------------------------
-    '    Public Sub FadeIn(Optional durationMs As Integer = 1000)
-    '        fadeDirection = 1
-    '        fadeSpeed = 255.0F / Math.Max(durationMs, 1)
-    '        isFading = True
-    '        alpha = 0
-    '        isVisible = True
-    '    End Sub
-
-    '    Public Sub FadeOut(Optional durationMs As Integer = 1000)
-    '        fadeDirection = -1
-    '        fadeSpeed = 255.0F / Math.Max(durationMs, 1)
-    '        isFading = True
-    '    End Sub
-
-    '    Private Sub ProcessFade()
-    '        If Not isFading Then Return
-
-    '        alpha += CInt(fadeDirection * fadeSpeed * Game.LastFrameTime * 1000.0F)
-    '        alpha = Math.Clamp(alpha, 0, 255)
-
-    '        If (fadeDirection = 1 AndAlso alpha >= 255) OrElse
-    '           (fadeDirection = -1 AndAlso alpha <= 0) Then
-    '            isFading = False
-    '            If fadeDirection = -1 Then isVisible = False
-    '        End If
-    '    End Sub
-
-    '    '---------------------------------------------
-    '    ' 🔹 Debug Mode Controls
-    '    '---------------------------------------------
-    '    Private Sub ProcessDebug()
-    '        If Not debugEnabled Then Return
-
-    '        ' Move image
-    '        If Game.isKeyPressed(Keys.Up) Then position.Y -= moveSpeed
-    '        If Game.isKeyPressed(Keys.Down) Then position.Y += moveSpeed
-    '        If Game.isKeyPressed(Keys.Left) Then position.X -= moveSpeed
-    '        If Game.isKeyPressed(Keys.Right) Then position.X += moveSpeed
-
-    '        ' Resize image
-    '        If Game.isKeyPressed(Keys.PageUp) Then
-    '            size.X += sizeSpeed
-    '            size.Y += sizeSpeed
-    '        End If
-    '        If Game.isKeyPressed(Keys.PageDown) Then
-    '            size.X -= sizeSpeed
-    '            size.Y -= sizeSpeed
-    '        End If
-
-    '        ' Rotate image (Q/E)
-    '        If Game.isKeyPressed(Keys.Q) Then rotation -= rotateSpeed
-    '        If Game.isKeyPressed(Keys.E) Then rotation += rotateSpeed
-
-    '        ' Clamp values
-    '        position.X = Math.Clamp(position.X, 0.0F, 1.0F)
-    '        position.Y = Math.Clamp(position.Y, 0.0F, 1.0F)
-    '        size.X = Math.Clamp(size.X, 0.01F, 2.0F)
-    '        size.Y = Math.Clamp(size.Y, 0.01F, 2.0F)
-    '        rotation = (rotation + 360.0F) Mod 360.0F
-
-    '        ' Save current settings (End key)
-    '        If Game.isKeyPressed(Keys.End) Then SaveCurrentSettings()
-    '    End Sub
-
-    '    Private Sub SaveCurrentSettings()
-    '        Try
-    '            Dim line As String = $"[NativeDrawImage Saved @ {DateTime.Now:HH:mm:ss}]" & vbCrLf &
-    '                                 $"Position = X:{position.X:F4}, Y:{position.Y:F4}" & vbCrLf &
-    '                                 $"Size = W:{size.X:F4}, H:{size.Y:F4}" & vbCrLf &
-    '                                 $"Rotation = {rotation:F2}" & vbCrLf &
-    '                                 $"Alpha = {alpha}" & vbCrLf &
-    '                                 $"--------------------------------------------------" & vbCrLf
-
-    '            File.AppendAllText(savePath, line)
-    '            Game.DisplayText("Saved image debug data to: " & Path.GetFileName(savePath), 2500)
-    '        Catch ex As Exception
-    '            Game.DisplayText("Error saving image data: " & ex.Message, 2500)
-    '        End Try
-    '    End Sub
-
-    '    '---------------------------------------------
-    '    ' 🔹 Properties
-    '    '---------------------------------------------
-    '    Public Property Visible As Boolean
-    '        Get
-    '            Return isVisible
-    '        End Get
-    '        Set(value As Boolean)
-    '            isVisible = value
-    '        End Set
-    '    End Property
-
-    '    Public Property Position As Vector2
-    '        Get
-    '            Return Position
-    '        End Get
-    '        Set(value As Vector2)
-    '            position = value
-    '        End Set
-    '    End Property
-
-    '    Public Property Size As Vector2
-    '        Get
-    '            Return Size
-    '        End Get
-    '        Set(value As Vector2)
-    '            size = value
-    '        End Set
-    '    End Property
-
-    '    Public Property Rotation As Single
-    '        Get
-    '            Return Rotation
-    '        End Get
-    '        Set(value As Single)
-    '            rotation = value
-    '        End Set
-    '    End Property
-
-    '    Public Property ImageColor As Color
-    '        Get
-    '            Return color
-    '        End Get
-    '        Set(value As Color)
-    '            color = value
-    '        End Set
-    '    End Property
-
-    '    Public ReadOnly Property CurrentAlpha As Integer
-    '        Get
-    '            Return alpha
-    '        End Get
-    '    End Property
-
-    '    Public ReadOnly Property IsCompletelyFadedOut As Boolean
-    '        Get
-    '            Return alpha <= 0
-    '        End Get
-    '    End Property
-
-    '    Public ReadOnly Property IsCompletelyFadedIn As Boolean
-    '        Get
-    '            Return alpha >= 255
-    '        End Get
-    '    End Property
-
-    '    Public Property DebugMode As Boolean
-    '        Get
-    '            Return debugEnabled
-    '        End Get
-    '        Set(value As Boolean)
-    '            debugEnabled = value
-    '        End Set
-    '    End Property
-
-    '    '---------------------------------------------
-    '    ' 🔹 Management
-    '    '---------------------------------------------
-    '    Public Sub Dispose()
-    '        activeImages.Remove(Me)
-    '        texture.Dispose()
-    '    End Sub
-
-    '    Private Shared Sub Tick()
-    '        For Each img As NativeDrawImage In activeImages
-    '            img.ProcessFade()
-    '            img.ProcessDebug()
-    '            img.Draw()
-    '        Next
-    '    End Sub
-
-    '    Private Shared Sub AttachTick()
-    '        If isTickAttached Then Return
-    '        TickHelper.Add(AddressOf Tick)
-    '        isTickAttached = True
-    '    End Sub
-
-    'End Class
-
-    '-----------------------------------------------------------------------------------------------------------------------------------------------------
-    'TICK Helper
-
-
-    Friend Class DrawManager
-
+    Friend NotInheritable Class DrawManager
         Private Shared ReadOnly ActiveDraws As New List(Of DrawRequest)
+        Private Shared ReadOnly ActiveDraws3D As New List(Of DrawRequest3D)
+        Private Shared ReadOnly ActiveBigPrints As New Dictionary(Of BigPrintType, BigPrintRequest)
+        Private Shared ReadOnly QueuedBigPrints As New Dictionary(Of BigPrintType, Queue(Of BigPrintRequest))
+        Private Shared ActiveHelpRequest As DrawRequest = Nothing
+        Private Shared ReadOnly QueuedHelpRequests As New Queue(Of DrawRequest)
         Private Shared isRunning As Boolean = False
+        Private Shared Sub EnsureRunning()
+            If isRunning Then Return
+            isRunning = True
+            TickHelper.Add_Internal(AddressOf Tick)
+        End Sub
+        Public Shared Sub DrawText(Text As String, Duration As Integer, Position As Vector2, Style As TextStyle, Optional BackgroundSize As Vector2 = Nothing,
+                                   Optional Wrap As (StartPos As Single?, EndPos As Single?, LineHeightMultiplier As Single?) = Nothing,
+                                   Optional ViewportID As Integer? = Nothing, Optional RenderID As Integer? = Nothing, Optional BackgroundPosition As Vector2? = Nothing)
 
-        Public Shared Sub DisplayTextAdvanced(text As String, duration As Integer, pos As Vector2, style As TextStyle)
+            If Duration < 1 Then Return
 
-            Dim req As New DrawRequest(text, duration, pos, style)
-            ActiveDraws.Add(req)
+            Dim Request As New DrawRequest(
+    Text,
+    Duration,
+    Position,
+    Style,
+    BackgroundSize,
+    Wrap:=Wrap,
+    ViewportID:=ViewportID,
+    RenderID:=RenderID,
+    BackgroundPosition:=BackgroundPosition)
 
-            If Not isRunning Then
-                isRunning = True
-                TickHelper.Add_Internal(AddressOf Tick)
+            ActiveDraws.Add(Request)
+            EnsureRunning()
+        End Sub
+        Public Shared Sub DrawGxtText(
+        GxtEntry As String,
+        Duration As Integer,
+        Position As Vector2,
+        Style As TextStyle,
+        Optional BackgroundSize As Vector2 = Nothing,
+Optional BackgroundPosition As Vector2? = Nothing,
+Optional LineHeightMultiplier As Single = 1.0F)
+
+            If Duration < 1 Then Return
+
+            Dim Request As New DrawRequest(
+    GxtEntry,
+    Duration,
+    Position,
+    Style,
+    True,
+    BackgroundSize,
+    BackgroundPosition,
+    LineHeightMultiplier)
+
+            ActiveDraws.Add(Request)
+            EnsureRunning()
+
+        End Sub
+        Public Shared Sub DrawPersistentText(Key As String, Text As String, Duration As Integer, Position As Vector2, Style As TextStyle, Optional TextLines As String() = Nothing, Optional LineSpacingY As Single = 0.0F)
+
+            If String.IsNullOrEmpty(Key) Then
+                Throw New ArgumentException(
+                "A persistent draw request requires a key.",
+                NameOf(Key))
+            End If
+
+            If Duration < 1 Then Return
+            Dim FinalLines As String() = Nothing
+            If TextLines IsNot Nothing Then FinalLines = CType(TextLines.Clone(), String())
+            For Each Request As DrawRequest In ActiveDraws
+
+                If Request.PersistentKey = Key Then
+
+                    Request.Refresh(
+                    Text,
+                    Duration,
+                    Position,
+                    Style)
+                    Request.TextLines = FinalLines
+                    Request.LineSpacingY = If(FinalLines IsNot Nothing, Math.Max(0.0F, LineSpacingY), 0.0F)
+
+                    EnsureRunning()
+                    Return
+
+                End If
+
+            Next
+
+            Dim NewRequest As New DrawRequest(
+            Text,
+            Duration,
+            Position,
+            Style,
+            PersistentKey:=Key)
+            NewRequest.TextLines = FinalLines
+            NewRequest.LineSpacingY = If(FinalLines IsNot Nothing, Math.Max(0.0F, LineSpacingY), 0.0F)
+            ActiveDraws.Add(NewRequest)
+
+            EnsureRunning()
+
+        End Sub
+        Public Shared Sub DrawRect(
+        Position As Vector2,
+        Size As Vector2,
+        Color As ColorRGBA,
+        Duration As Integer,
+        Optional BordersThickness As Single = 0.0F,
+        Optional BordersColor As ColorRGBA = Nothing)
+
+            If Duration < 1 Then Return
+
+            ActiveDraws.Add(
+            New DrawRequest(
+                Position,
+                Size,
+                Duration,
+                Color,
+                BordersColor,
+                BordersThickness))
+
+            EnsureRunning()
+
+        End Sub
+        Public Shared Sub DrawGameTexture(
+        Texture As GameTexture,
+        Position As Vector2,
+        Size As Vector2,
+        Rotation As Single,
+        Color As ColorRGBA,
+        Duration As Integer)
+
+            If Texture Is Nothing OrElse Duration < 1 Then Return
+
+            ActiveDraws.Add(
+            New DrawRequest(
+                Texture,
+                Position,
+                Size,
+                Rotation,
+                Color,
+                Duration))
+
+            EnsureRunning()
+
+        End Sub
+        ''' <summary>
+        ''' Registers a curved window and its optional title area as a single
+        ''' draw request. Both share the same duration and lifecycle.
+        ''' The supplied position represents the top-left corner.
+        ''' </summary>
+        ''' <param name="Position">The normalized top-left position.</param>
+        ''' <param name="Size">The normalized window size.</param>
+        ''' <param name="Alpha">The window opacity, from 0 to 255.</param>
+        ''' <param name="Duration">Display duration in milliseconds.</param>
+        ''' <param name="TitleLabelHeight">The optional title area height.</param>
+        Public Shared Sub DrawCurvedWindow(Position As Vector2, Size As Vector2, Alpha As Integer, Duration As Integer, Optional TitleLabelHeight As Single = 0.0F)
+            If Duration < 1 Then Return
+            Dim Request As New DrawRequest(Position, Size, Duration, Alpha, TitleLabelHeight)
+            ActiveDraws.Add(Request)
+            EnsureRunning()
+        End Sub
+        Public Shared Sub DrawWindow(Position As Vector2, Size As Vector2, Color As ColorRGBA, Duration As Integer, BordersColor As ColorRGBA, BordersThickness As Single, TitleLabelHeight As Single)
+            If Duration < 1 Then Return
+            Dim Request As New DrawRequest(Position, Size, Duration, Color, BordersColor, BordersThickness, TitleLabelHeight:=TitleLabelHeight, IsWindow:=True)
+            ActiveDraws.Add(Request)
+            EnsureRunning()
+        End Sub
+        Public Shared Sub DrawFrontBuff(
+        Position As Vector2,
+        Size As Vector2,
+        Rotation As Single,
+        Color As ColorRGBA,
+        Duration As Integer)
+
+            If Duration < 1 Then Return
+
+            ActiveDraws.Add(
+            New DrawRequest(
+                Position,
+                Size,
+                Duration,
+                Rotation,
+                Color))
+
+            EnsureRunning()
+
+        End Sub
+        Public Shared Sub DrawBigPrintText(Text As String, Duration As Integer, Type As BigPrintType, Position As Vector2, Style As TextStyle, Mode As QueueMode)
+
+            If Duration < 1 Then Return
+
+            Dim Request As New BigPrintRequest(
+            Text,
+            Duration,
+            Type,
+            Position,
+            Style)
+
+            Select Case Mode
+                Case QueueMode.DisplayNow
+                    ClearBigPrintText(Type)
+                    StartBigPrint(Request)
+                    'RenderBigPrint(Request)
+
+                Case QueueMode.AddToQueue
+                    If ActiveBigPrints.ContainsKey(Type) Then
+                        Dim Pending As Queue(Of BigPrintRequest) = Nothing
+                        If Not QueuedBigPrints.TryGetValue(Type, Pending) Then
+                            Pending = New Queue(Of BigPrintRequest)
+                            QueuedBigPrints.Add(Type, Pending)
+                        End If
+                        Pending.Enqueue(Request)
+                    Else
+                        StartBigPrint(Request)
+                        'RenderBigPrint(Request)
+                    End If
+
+                Case QueueMode.IgnoreIfBusy
+                    Dim Pending As Queue(Of BigPrintRequest) = Nothing
+                    If ActiveBigPrints.ContainsKey(Type) OrElse (QueuedBigPrints.TryGetValue(Type, Pending) AndAlso Pending.Count > 0) Then Return
+                    StartBigPrint(Request)
+                    'RenderBigPrint(Request)
+
+                Case Else
+                    Throw New ArgumentOutOfRangeException(NameOf(Mode), Mode, "Unknown message queue mode.")
+            End Select
+
+            EnsureRunning()
+        End Sub
+        Public Shared Sub DrawHelpText(Text As String, Duration As Integer, Position As Vector2, Style As TextStyle, BackgroundSize As Vector2, Wrap As (StartPos As Single?, EndPos As Single?, LineHeightMultiplier As Single?), BackgroundPosition As Vector2?, Mode As QueueMode, PlaySound As Boolean)
+            If Duration = 0 OrElse Duration < -1 Then Throw New ArgumentOutOfRangeException(NameOf(Duration), "Duration must be -1 (forever) or positive.")
+            Dim Request As New DrawRequest(Text, Duration, Position, Style, BackgroundSize, Wrap:=Wrap, BackgroundPosition:=BackgroundPosition)
+            Request.PlaySoundOnStart = PlaySound
+            Select Case Mode
+                Case QueueMode.DisplayNow
+                    ActiveHelpRequest = Nothing
+                    QueuedHelpRequests.Clear()
+                    StartHelpRequest(Request)
+                Case QueueMode.AddToQueue
+                    If ActiveHelpRequest Is Nothing Then StartHelpRequest(Request) Else QueuedHelpRequests.Enqueue(Request)
+                Case QueueMode.IgnoreIfBusy
+                    If ActiveHelpRequest IsNot Nothing OrElse QueuedHelpRequests.Count > 0 Then Return
+                    StartHelpRequest(Request)
+                Case Else
+                    Throw New ArgumentOutOfRangeException(NameOf(Mode), Mode, "Unknown message queue mode.")
+            End Select
+            EnsureRunning()
+        End Sub
+        '--------------
+        Private Shared Sub StartHelpRequest(Request As DrawRequest)
+            ActiveHelpRequest = Request
+            Request.StartTime = NativeTimer.TotalGameTime
+            Request.HasRendered = False
+            [Call]("CLEAR_HELP")
+            If Request.PlaySoundOnStart Then NativeAudio.Trigger(NativeAudio.GameSounds.HelpMessage)
+        End Sub
+        Private Shared Sub ProcessHelpRequests()
+            If ActiveHelpRequest IsNot Nothing AndAlso ActiveHelpRequest.IsExpired Then ActiveHelpRequest = Nothing
+            If ActiveHelpRequest Is Nothing AndAlso QueuedHelpRequests.Count > 0 Then StartHelpRequest(QueuedHelpRequests.Dequeue())
+        End Sub
+        Public Shared Sub ClearHelpRequests()
+            ActiveHelpRequest = Nothing
+            QueuedHelpRequests.Clear()
+        End Sub
+        ' ============================================================
+        ' RICHIESTE 3D
+        ' ============================================================
+        Public Shared Sub DrawCorona(
+        Position As GTA.Vector3,
+        Radius As Single,
+        Color As ColorRGB,
+        Intensity As Single,
+        Duration As Integer)
+
+            If Duration < 1 OrElse Radius <= 0.0F OrElse Intensity <= 0.0F Then
+                Return
+            End If
+
+            ActiveDraws3D.Add(
+            New DrawRequest3D(
+                Position,
+                Duration,
+                Color,
+                Radius,
+                Intensity))
+
+            EnsureRunning()
+
+        End Sub
+        Public Shared Sub DrawLight(
+        Position As GTA.Vector3,
+        Color As ColorRGB,
+        Intensity As Single,
+        Range As Single,
+        CoronaRadius As Single,
+        CoronaIntensity As Single,
+        Duration As Integer)
+
+            If Duration < 1 Then Return
+
+            ActiveDraws3D.Add(
+            New DrawRequest3D(
+                Position,
+                Duration,
+                Color,
+                Intensity,
+                Range,
+                CoronaRadius,
+                CoronaIntensity))
+
+            EnsureRunning()
+
+        End Sub
+        Public Shared Sub DrawArrow(
+        Position As GTA.Vector3,
+        Color As ColorRGBA,
+        Unknown01 As Single,
+        Unknown02 As Single,
+        Duration As Integer)
+
+            If Duration < 1 Then Return
+
+            ActiveDraws3D.Add(
+            New DrawRequest3D(
+                Position,
+                Duration,
+                Color,
+                Unknown01,
+                Unknown02))
+
+            EnsureRunning()
+
+        End Sub
+        Public Shared Sub DrawCheckpoint(Position As GTA.Vector3, Radius As Single, Color As ColorRGBA, UseSphere As Boolean, Duration As Integer)
+            If Duration < 1 Then Return
+            ActiveDraws3D.Add(New DrawRequest3D(Position, Duration, Radius, Color, UseSphere))
+            EnsureRunning()
+        End Sub
+        ' ============================================================
+        Private Shared Sub StartBigPrint(Request As BigPrintRequest)
+
+            Request.StartTime = NativeTimer.TotalGameTime
+
+            ' Nasconde l'eventuale testo nativo presente
+            ' nella stessa posizione.
+
+            [Call]("PRINT_BIG", "STRING", 2, CInt(Request.Type))
+
+            ActiveBigPrints(Request.Type) = Request
+
+        End Sub
+        Private Shared Sub RenderBigPrint(Request As BigPrintRequest)
+
+            TextStyle.SetTextStyle(
+            Request.Style,
+            (StartPos:=0.0F,
+             EndPos:=1.0F,
+             LineHeightMultiplier:=1.0F))
+
+            [Call](
+            "DISPLAY_TEXT_WITH_LITERAL_STRING",
+            Request.Position.X,
+            Request.Position.Y,
+            "STRING",
+            Request.Text)
+
+        End Sub
+        Private Shared Sub ProcessBigPrints()
+
+            Dim ExpiredTypes As New List(Of BigPrintType)
+
+            For Each Pair As KeyValuePair(Of BigPrintType, BigPrintRequest) _
+            In ActiveBigPrints
+
+                If Pair.Value.IsExpired Then
+                    ExpiredTypes.Add(Pair.Key)
+                End If
+
+            Next
+
+            For Each Type As BigPrintType In ExpiredTypes
+
+                ActiveBigPrints.Remove(Type)
+
+                Dim Pending As Queue(Of BigPrintRequest) = Nothing
+
+                If QueuedBigPrints.TryGetValue(Type, Pending) Then
+
+                    If Pending.Count > 0 Then
+
+                        ' Il successivo messaggio inizia solo quando
+                        ' il precedente è effettivamente terminato.
+
+                        Dim NextRequest As BigPrintRequest = Pending.Dequeue()
+
+                        StartBigPrint(NextRequest)
+
+                    End If
+
+                    If Pending.Count = 0 Then
+                        QueuedBigPrints.Remove(Type)
+                    End If
+
+                End If
+
+            Next
+
+        End Sub
+        Public Shared Sub ClearBigPrintText(Type As BigPrintType)
+
+            ActiveBigPrints.Remove(Type)
+            QueuedBigPrints.Remove(Type)
+
+        End Sub
+        Public Shared Sub ClearAllBigPrintTexts()
+            ActiveBigPrints.Clear()
+            QueuedBigPrints.Clear()
+        End Sub
+        Private Shared Sub RenderRectangle(
+    Position As Vector2,
+    Size As Vector2,
+    Color As ColorRGBA,
+    BordersThickness As Single,
+    BordersColor As ColorRGBA)
+
+            ' Fill.
+            [Call](
+        "DRAW_RECT",
+        Position.X,
+        Position.Y,
+        Size.X,
+        Size.Y,
+        Color.Red,
+        Color.Green,
+        Color.Blue,
+        Color.Alpha)
+
+            If BordersThickness <= 0.0F Then Return
+
+            Dim FinalBorderColor As ColorRGBA = BordersColor
+
+            If FinalBorderColor = Nothing Then
+                FinalBorderColor = ColorRGBA.Black
+            End If
+
+            Dim Aspect As Single = Tools.ScreenAspectRatio
+
+            Dim ThicknessX As Single = BordersThickness
+            Dim ThicknessY As Single = ThicknessX * Aspect
+
+            Dim HalfX As Single = Size.X / 2.0F
+            Dim HalfY As Single = Size.Y / 2.0F
+
+            Dim HalfThicknessX As Single = ThicknessX / 2.0F
+            Dim HalfThicknessY As Single = ThicknessY / 2.0F
+
+            Dim HorizontalWidth As Single =
+        Size.X + ThicknessX * 2.0F
+
+            Dim TopCenterY As Single =
+        Position.Y - HalfY - HalfThicknessY
+
+            Dim BottomCenterY As Single =
+        Position.Y + HalfY + HalfThicknessY
+
+            ' Top border.
+            [Call](
+        "DRAW_RECT",
+        Position.X,
+        TopCenterY,
+        HorizontalWidth,
+        ThicknessY,
+        FinalBorderColor.Red,
+        FinalBorderColor.Green,
+        FinalBorderColor.Blue,
+        FinalBorderColor.Alpha)
+
+            ' Bottom border.
+            [Call](
+        "DRAW_RECT",
+        Position.X,
+        BottomCenterY,
+        HorizontalWidth,
+        ThicknessY,
+        FinalBorderColor.Red,
+        FinalBorderColor.Green,
+        FinalBorderColor.Blue,
+        FinalBorderColor.Alpha)
+
+            Dim LeftCenterX As Single =
+        Position.X - HalfX - HalfThicknessX
+
+            Dim RightCenterX As Single =
+        Position.X + HalfX + HalfThicknessX
+
+            ' Left border.
+            [Call](
+        "DRAW_RECT",
+        LeftCenterX,
+        Position.Y,
+        ThicknessX,
+        Size.Y,
+        FinalBorderColor.Red,
+        FinalBorderColor.Green,
+        FinalBorderColor.Blue,
+        FinalBorderColor.Alpha)
+
+            ' Right border.
+            [Call](
+        "DRAW_RECT",
+        RightCenterX,
+        Position.Y,
+        ThicknessX,
+        Size.Y,
+        FinalBorderColor.Red,
+        FinalBorderColor.Green,
+        FinalBorderColor.Blue,
+        FinalBorderColor.Alpha)
+
+        End Sub
+        Private Shared Sub RenderTextRequest(Request As DrawRequest)
+            RenderTextBackground(Request)
+            If Request.TextLines IsNot Nothing Then
+                For i As Integer = 0 To Request.TextLines.Length - 1
+                    TextStyle.SetTextStyle(Request.Style, Request.Wrap, Request.ViewportID, Request.RenderID)
+
+                    [Call]("DISPLAY_TEXT_WITH_LITERAL_STRING",
+                   Request.Position.X,
+                   Request.Position.Y + (i * Request.LineSpacingY),
+                   "STRING",
+                   Request.TextLines(i))
+                Next
+            ElseIf Request.Text IsNot Nothing AndAlso Request.Text.IndexOf(TextColors.FX_LineBreak, StringComparison.Ordinal) >= 0 Then
+                Dim ExplicitLines As String() = NativeDraws.SplitTextAtLineBreak(Request.Text)
+                NativeDraws.RenderLiteralTextLines(ExplicitLines, Request.Position, Request.Style, Request.Wrap, Request.ViewportID, Request.RenderID)
+            Else
+                TextStyle.SetTextStyle(Request.Style, Request.Wrap, Request.ViewportID, Request.RenderID)
+                [Call]("DISPLAY_TEXT_WITH_LITERAL_STRING", Request.Position.X, Request.Position.Y, "STRING", Request.Text)
             End If
         End Sub
-        Public Shared Sub DrawRect(pos As Vector2, size As Vector2, color As ColorRGBA, duration As Integer)
+        Private Shared Sub RenderTextBackground(Request As DrawRequest)
 
-            Dim req As New DrawRequest(pos, size, duration, color)
-            ActiveDraws.Add(req)
+            If Request.Style Is Nothing Then Return
 
-            If Not isRunning Then
-                isRunning = True
-                TickHelper.Add_Internal(AddressOf Tick)
+            If Request.Style.Background.Alpha = 0 Then Return
+
+            If Request.BackgroundSize.X <= 0.0F OrElse
+       Request.BackgroundSize.Y <= 0.0F Then Return
+
+            NativeDraws.DrawRectangle(
+        Request.BackgroundPosition,
+        Request.BackgroundSize,
+        Request.Style.Background,
+        Duration:=1)
+
+        End Sub
+        Private Shared Sub RenderHelpTextRequest(Request As DrawRequest)
+            RenderTextBackground(Request)
+
+            If Request.Text IsNot Nothing AndAlso Request.Text.IndexOf(TextColors.FX_LineBreak, StringComparison.Ordinal) >= 0 Then
+                Dim ExplicitLines As String() = NativeDraws.SplitTextAtLineBreak(Request.Text)
+                NativeDraws.RenderLiteralTextLines(ExplicitLines, Request.Position, Request.Style, Request.Wrap, Request.ViewportID, Request.RenderID)
+            Else
+                TextStyle.SetTextStyle(Request.Style, Request.Wrap, Request.ViewportID, Request.RenderID)
+                [Call]("DISPLAY_TEXT_WITH_LITERAL_STRING", Request.Position.X, Request.Position.Y, "STRING", Request.Text)
             End If
         End Sub
-        Public Shared Sub DrawGameTexture(Texture As GameTexture, pos As Vector2, size As Vector2, rot As Single, color As ColorRGBA, duration As Integer)
-            Dim req As New DrawRequest(Texture, pos, size, rot, color, duration)
-            ActiveDraws.Add(req)
-
-            If Not isRunning Then
-                isRunning = True
-                TickHelper.Add_Internal(AddressOf Tick)
-            End If
-        End Sub
-        Public Shared Sub DrawCurvedWindow(pos As Vector2, size As Vector2, alpha As Integer, duration As Integer)
-
-            Dim req As New DrawRequest(pos, size, duration, alpha)
-            ActiveDraws.Add(req)
-
-            If Not isRunning Then
-                isRunning = True
-                TickHelper.Add_Internal(AddressOf Tick)
-            End If
-        End Sub
-        Public Shared Sub DrawFrontBuff(pos As Vector2, size As Vector2, rot As Single, color As ColorRGBA, duration As Integer)
-
-            Dim req As New DrawRequest(pos, size, duration, rot, color)
-            ActiveDraws.Add(req)
-
-            If Not isRunning Then
-                isRunning = True
-                TickHelper.Add_Internal(AddressOf Tick)
-            End If
-        End Sub
-        '-----------------------------------------------------------------------------------------------------------------------------
         Private Shared Sub Tick()
-            ' rimuove tutti i testi scaduti
-            ActiveDraws.RemoveAll(Function(t) t.IsExpired)
-
-            ' se non ci sono testi attivi → disattiva tick
-            If ActiveDraws.Count = 0 Then
+            ActiveDraws.RemoveAll(Function(Request) Request.IsExpired)
+            ActiveDraws3D.RemoveAll(Function(Request) Request.IsExpired)
+            ProcessBigPrints()
+            ProcessHelpRequests()
+            If ActiveDraws.Count = 0 AndAlso ActiveDraws3D.Count = 0 AndAlso ActiveBigPrints.Count = 0 AndAlso
+                ActiveHelpRequest Is Nothing AndAlso QueuedHelpRequests.Count = 0 AndAlso QueuedBigPrints.Count = 0 Then
                 isRunning = False
                 TickHelper.Remove_Internal(AddressOf Tick)
                 Return
             End If
 
-            For Each t In ActiveDraws
-                'TextAdvanced
-                If t.Type = DrawRequest.DrawType.TextAdvanced Then
-                    TextStyle.SetTextStyle(t.Style)
-                    [Call]("DISPLAY_TEXT_WITH_LITERAL_STRING", t.Position.X, t.Position.Y, "STRING", t.Text)
-                End If
-                'Rectangle
-                If t.Type = DrawRequest.DrawType.Rectangle Then
-                    [Call]("DRAW_RECT", t.Position.X, t.Position.Y, t.Size.X, t.Size.Y, t.Color_NoText.Red, t.Color_NoText.Green, t.Color_NoText.Blue, t.Color_NoText.Alpha)
-                End If
-                'CurvedWindows
-                If t.Type = DrawRequest.DrawType.CurvedWindow Then
-                    [Call]("DRAW_CURVED_WINDOW", t.Position.X, t.Position.Y, t.Size.X, t.Size.Y, t.CurvedWindowAlpha)
-                End If
-                'Game Texture
-                If t.Type = DrawRequest.DrawType.GameTexture Then
-                    [Call]("DRAW_SPRITE", t.GameTexture.TextureHandler, t.Position.X, t.Position.Y, t.Size.X, t.Size.Y, t.Rotation, t.Color_NoText.Red, t.Color_NoText.Green, t.Color_NoText.Blue, t.Color_NoText.Alpha)
-                End If
-                'FrontBuff
-                If t.Type = DrawRequest.DrawType.FrontBuff Then
-                    [Call]("DRAW_SPRITE_FRONT_BUFF", t.Position.X, t.Position.Y, t.Size.X, t.Size.Y, t.Rotation, t.Color_NoText.Red, t.Color_NoText.Green, t.Color_NoText.Blue, t.Color_NoText.Alpha)
-                End If
+            For Each Request As DrawRequest In ActiveDraws
+                Select Case Request.Type
+                    Case DrawRequest.DrawType.TextAdvanced
+                        RenderTextRequest(Request)
+
+                    Case DrawRequest.DrawType.GxtText
+                        RenderTextBackground(Request)
+                        If Request.Style IsNot Nothing Then
+                            TextStyle.SetTextStyle(Request.Style, Request.Wrap, Request.ViewportID, Request.RenderID)
+                        End If
+                        [Call]("DISPLAY_TEXT", Request.Position.X, Request.Position.Y, Request.Text)
+
+                    Case DrawRequest.DrawType.Rectangle
+                        RenderRectangle(Request.Position, Request.Size, Request.Color_NoText, Request.BordersThickness, Request.BordersColor)
+
+                    Case DrawRequest.DrawType.Window
+                        RenderRectangle(Request.Position, Request.Size, Request.Color_NoText, Request.BordersThickness, Request.BordersColor)
+                        If Request.TitleLabelHeight > 0.0F Then
+                            Dim FinalTitleHeight As Single = Math.Min(Request.TitleLabelHeight, Request.Size.Y)
+                            Dim TitleCenterY As Single = Request.Position.Y - (Request.Size.Y / 2.0F) + (FinalTitleHeight / 2.0F)
+                            Dim TitlePosition As New Vector2(Request.Position.X, TitleCenterY)
+                            Dim TitleSize As New Vector2(Request.Size.X, FinalTitleHeight)
+
+                            RenderRectangle(TitlePosition, TitleSize, Request.Color_NoText, Request.BordersThickness, Request.BordersColor)
+                        End If
+
+
+                    Case DrawRequest.DrawType.CurvedWindow
+                        [Call]("DRAW_CURVED_WINDOW", Request.Position.X, Request.Position.Y, Request.Size.X, Request.Size.Y, Request.CurvedWindowAlpha)
+                        If Request.TitleLabelHeight > 0.0F Then
+                            Dim FinalTitleHeight As Single = Math.Min(Request.TitleLabelHeight, Request.Size.Y)
+
+                            [Call]("DRAW_CURVED_WINDOW", Request.Position.X, Request.Position.Y, Request.Size.X, FinalTitleHeight, Request.CurvedWindowAlpha)
+                        End If
+
+                    Case DrawRequest.DrawType.GameTexture
+                        If Request.GameTexture Is Nothing OrElse Not Request.GameTexture.Load() Then Continue For
+                        [Call]("DRAW_SPRITE", Request.GameTexture.Handle, Request.Position.X, Request.Position.Y, Request.Size.X, Request.Size.Y, Request.Rotation,
+                               Request.Color_NoText.Red, Request.Color_NoText.Green, Request.Color_NoText.Blue, Request.Color_NoText.Alpha)
+
+
+                    Case DrawRequest.DrawType.FrontBuff
+                        [Call]("DRAW_SPRITE_FRONT_BUFF", Request.Position.X, Request.Position.Y, Request.Size.X, Request.Size.Y, Request.Rotation,
+                               Request.Color_NoText.Red, Request.Color_NoText.Green, Request.Color_NoText.Blue, Request.Color_NoText.Alpha)
+                End Select
+                Request.MarkRendered()
             Next
+
+            For Each Request As DrawRequest3D In ActiveDraws3D
+                Request.Render()
+                Request.MarkRendered()
+            Next
+
+            For Each Pair As KeyValuePair(Of BigPrintType, BigPrintRequest) _
+            In ActiveBigPrints
+                RenderBigPrint(Pair.Value)
+            Next
+            If ActiveHelpRequest IsNot Nothing Then
+                RenderHelpTextRequest(ActiveHelpRequest)
+                ActiveHelpRequest.MarkRendered()
+            End If
         End Sub
+
         Private Class DrawRequest
+
             Public Enum DrawType
                 TextAdvanced = 0
                 Rectangle = 1
                 CurvedWindow = 2
                 FrontBuff = 3
                 GameTexture = 4
+                GxtText = 5
+                Window = 6
             End Enum
-            Public ReadOnly Text As String
-            Public ReadOnly Position As Vector2
-            Public ReadOnly Style As TextStyle
-            Public ReadOnly Duration As Integer
-            Public ReadOnly StartTime As Integer
-            Public ReadOnly Type As DrawType
-            Public ReadOnly Size As Vector2
-            Public ReadOnly Color_NoText As ColorRGBA
-            Public ReadOnly CurvedWindowAlpha As Integer
-            Public ReadOnly GameTexture As GameTexture
-            Public ReadOnly Rotation As Single
 
-            Public Sub New(text As String, duration As Integer, pos As Vector2, style As TextStyle)
-                Me.Text = text
-                Position = pos
-                Me.Style = style
-                Me.Duration = duration
-                StartTime = NativeTimer.TotalGameTime
+            Public Text As String
+            Public TextLines As String()
+            Public LineSpacingY As Single
+            Public PlaySoundOnStart As Boolean
+            Public Position As Vector2
+            Public Style As TextStyle
+
+            Public Duration As Integer
+            Public StartTime As Integer
+            Public HasRendered As Boolean = False
+
+            Public Type As DrawType
+
+            Public Size As Vector2
+            Public Color_NoText As ColorRGBA
+
+            Public CurvedWindowAlpha As Integer
+            Public ReadOnly TitleLabelHeight As Single
+
+            Public GameTexture As GameTexture
+            Public Rotation As Single
+
+            Public BordersColor As ColorRGBA
+            Public BordersThickness As Single
+            Public ReadOnly Wrap As (StartPos As Single?, EndPos As Single?, LineHeightMultiplier As Single?)
+            Public ReadOnly ViewportID As Integer?
+            Public ReadOnly RenderID As Integer?
+
+            Public BackgroundSize As Vector2
+            Public BackgroundPosition As Vector2
+
+            Public PersistentKey As String
+
+            'Custom Text (DrawText)
+            Public Sub New(Text As String, Duration As Integer, Position As Vector2, Style As TextStyle, Optional BackgroundSize As Vector2 = Nothing, Optional PersistentKey As String = Nothing,
+                           Optional Wrap As (StartPos As Single?, EndPos As Single?, LineHeightMultiplier As Single?) = Nothing, Optional ViewportID As Integer? = Nothing, Optional RenderID As Integer? = Nothing,
+                           Optional BackgroundPosition As Vector2? = Nothing)
+
+                Me.Text = If(Text, String.Empty)
+                Me.Position = Position
+                Me.Style = Style
+                Me.Duration = Duration
+                Me.StartTime = NativeTimer.TotalGameTime
+
+                Me.BackgroundSize = BackgroundSize
+                Me.BackgroundPosition = If(BackgroundPosition.HasValue, BackgroundPosition.Value, Position)
+
+                Me.PersistentKey = PersistentKey
+
+                Me.Wrap = Wrap
+                Me.ViewportID = ViewportID
+                Me.RenderID = RenderID
+
                 Type = DrawType.TextAdvanced
             End Sub
-            Public Sub New(RectPos As Vector2, RectSize As Vector2, Duration As Integer, Color As ColorRGBA)
+
+            'GXT Texts (GXT.Draw)
+            Public Sub New(
+    GxtEntry As String,
+    Duration As Integer,
+    Position As Vector2,
+    Style As TextStyle,
+    IsGxtText As Boolean,
+    Optional BackgroundSize As Vector2 = Nothing,
+    Optional BackgroundPosition As Vector2? = Nothing,
+    Optional LineHeightMultiplier As Single = 1.0F)
+
+                Me.Text = GxtEntry
+                Me.Position = Position
+                Me.Style = Style
+                Me.Duration = Duration
+                Me.StartTime = NativeTimer.TotalGameTime
+
+                Me.BackgroundSize = BackgroundSize
+                Me.BackgroundPosition =
+        If(BackgroundPosition.HasValue, BackgroundPosition.Value, Position)
+
+                Me.Wrap = (
+        StartPos:=CType(0.0F, Single?),
+        EndPos:=CType(1.0F, Single?),
+        LineHeightMultiplier:=CType(
+            ClampFloat(LineHeightMultiplier, 0.7F, 10.0F),
+            Single?))
+
+                Type = DrawType.GxtText
+
+            End Sub
+
+            'Rectangle / Window
+            Public Sub New(RectPos As Vector2, RectSize As Vector2, Duration As Integer, Color As ColorRGBA, Optional BordersColor As ColorRGBA = Nothing,
+                           Optional BordersThickness As Single = 0.0F, Optional TitleLabelHeight As Single = 0.0F, Optional IsWindow As Boolean = False)
+
                 Position = RectPos
                 Size = RectSize
                 Me.Duration = Duration
-                Color_NoText = Color
+                Me.Color_NoText = Color
+                Me.BordersColor = BordersColor
+                Me.BordersThickness = BordersThickness
+                Me.TitleLabelHeight = Math.Max(0.0F, TitleLabelHeight)
                 StartTime = NativeTimer.TotalGameTime
-                Type = DrawType.Rectangle
+                If IsWindow Then Type = DrawType.Window Else Type = DrawType.Rectangle
             End Sub
-            Public Sub New(FrontBuffPos As Vector2, FrontBuffSize As Vector2, Duration As Integer, rotation As Single, Color As ColorRGBA)
-                Position = FrontBuffPos
-                Size = FrontBuffSize
+
+            'Front Buff
+            Public Sub New(Position As Vector2, Size As Vector2, Duration As Integer, Rotation As Single, Color As ColorRGBA)
+                Me.Position = Position
+                Me.Size = Size
                 Me.Duration = Duration
-                Color_NoText = Color
-                Me.Rotation = rotation
-                StartTime = NativeTimer.TotalGameTime
+                Me.Rotation = Rotation
+                Me.Color_NoText = Color
+                Me.StartTime = NativeTimer.TotalGameTime
                 Type = DrawType.FrontBuff
             End Sub
-            Public Sub New(Texture As GameTexture, GameTexturePos As Vector2, GameTextureSize As Vector2, Rotation As Single, Color As ColorRGBA, Duration As Integer)
-                Position = GameTexturePos
-                Size = GameTextureSize
-                Me.Duration = Duration
-                Color_NoText = Color
-                StartTime = NativeTimer.TotalGameTime
-                GameTexture = Texture
+
+            'Game Texture
+            Public Sub New(Texture As GameTexture, Position As Vector2, Size As Vector2, Rotation As Single, Color As ColorRGBA, Duration As Integer)
+                Me.GameTexture = Texture
+                Me.Position = Position
+                Me.Size = Size
                 Me.Rotation = Rotation
+                Me.Color_NoText = Color
+                Me.Duration = Duration
+                Me.StartTime = NativeTimer.TotalGameTime
                 Type = DrawType.GameTexture
             End Sub
-            Public Sub New(CurvWindowsPos As Vector2, CurvWindowsSize As Vector2, Duration As Integer, Alpha As Integer)
-                Position = CurvWindowsPos
-                Size = CurvWindowsSize
+
+            'Curved Window
+            Public Sub New(CurvedWindowPos As Vector2, CurvedWindowSize As Vector2, Duration As Integer, Alpha As Integer, Optional TitleLabelHeight As Single = 0.0F)
+                Position = CurvedWindowPos
+                Size = CurvedWindowSize
                 Me.Duration = Duration
                 CurvedWindowAlpha = Alpha
+                Me.TitleLabelHeight = Math.Max(0.0F, TitleLabelHeight)
                 StartTime = NativeTimer.TotalGameTime
                 Type = DrawType.CurvedWindow
             End Sub
+
+            Public Sub Refresh(Text As String, Duration As Integer, Position As Vector2, Style As TextStyle)
+                Me.Text = If(Text, String.Empty)
+                Me.Duration = Duration
+                Me.Position = Position
+                Me.Style = Style
+                Me.StartTime = NativeTimer.TotalGameTime
+                Me.HasRendered = False
+                Me.TextLines = Nothing
+                Me.LineSpacingY = 0.0F
+                Me.PlaySoundOnStart = False
+            End Sub
+            Public Sub MarkRendered()
+                If HasRendered Then Return
+
+                StartTime = NativeTimer.TotalGameTime
+                HasRendered = True
+            End Sub
             Public ReadOnly Property IsExpired As Boolean
                 Get
-                    Return (NativeTimer.TotalGameTime - StartTime) >= Duration
+                    Return Duration >= 0 AndAlso HasRendered AndAlso
+                        (NativeTimer.TotalGameTime - StartTime >= Duration)
                 End Get
             End Property
         End Class
+
+        Private Class DrawRequest3D
+
+            Public Enum Draw3DType
+                Corona
+                Light
+                Arrow
+                Checkpoint
+            End Enum
+
+            Public ReadOnly Type As Draw3DType
+
+            Public ReadOnly Position As GTA.Vector3
+            Public ReadOnly Duration As Integer
+            Public StartTime As Integer
+            Public HasRendered As Boolean = False
+
+            Public ReadOnly Red As Integer
+            Public ReadOnly Green As Integer
+            Public ReadOnly Blue As Integer
+            Public ReadOnly Alpha As Integer
+
+            Public ReadOnly Radius As Single
+            Public ReadOnly Intensity As Single
+            Public ReadOnly LightIntensity As Single
+            Public ReadOnly Range As Single
+
+            Public ReadOnly CoronaRadius As Single
+            Public ReadOnly CoronaIntensity As Single
+
+            Public ReadOnly Unknown01 As Single
+            Public ReadOnly Unknown02 As Single
+
+            Public ReadOnly Color As ColorRGBA
+            Public ReadOnly UseSphere As Boolean
+
+
+            Public Sub New(
+            Position As GTA.Vector3,
+            Duration As Integer,
+            Color As ColorRGB,
+            Radius As Single,
+            Intensity As Single)
+
+                Type = Draw3DType.Corona
+
+                Me.Position = Position
+                Me.Duration = Duration
+                StartTime = NativeTimer.TotalGameTime
+
+                Red = Color.Red
+                Green = Color.Green
+                Blue = Color.Blue
+
+                Me.Radius = Radius
+                Me.Intensity = Math.Max(0.0F, Math.Min(100.0F, Intensity))
+
+            End Sub
+
+
+            Public Sub New(
+            Position As GTA.Vector3,
+            Duration As Integer,
+            Color As ColorRGB,
+            Intensity As Single,
+            Range As Single,
+            CoronaRadius As Single,
+            CoronaIntensity As Single)
+
+                Type = Draw3DType.Light
+
+                Me.Position = Position
+                Me.Duration = Duration
+                StartTime = NativeTimer.TotalGameTime
+
+                Red = Color.Red
+                Green = Color.Green
+                Blue = Color.Blue
+
+                LightIntensity = Intensity
+                Me.Range = Range
+
+                Me.CoronaRadius = CoronaRadius
+                Me.CoronaIntensity =
+                Math.Max(0.0F, Math.Min(100.0F, CoronaIntensity))
+
+            End Sub
+
+
+            Public Sub New(
+            Position As GTA.Vector3,
+            Duration As Integer,
+            Color As ColorRGBA,
+            Unknown01 As Single,
+            Unknown02 As Single)
+
+                Type = Draw3DType.Arrow
+
+                Me.Position = Position
+                Me.Duration = Duration
+                StartTime = NativeTimer.TotalGameTime
+
+                Me.Color = Color
+
+                Me.Unknown01 = Unknown01
+                Me.Unknown02 = Unknown02
+
+            End Sub
+
+
+            Public Sub New(
+            Position As GTA.Vector3,
+            Duration As Integer,
+            Radius As Single,
+            Color As ColorRGBA,
+            UseSphere As Boolean)
+
+                Type = Draw3DType.Checkpoint
+
+                Me.Position = Position
+                Me.Duration = Duration
+                StartTime = NativeTimer.TotalGameTime
+
+                Me.Radius = Radius
+                Me.Color = Color
+                Me.UseSphere = UseSphere
+
+            End Sub
+
+
+            Public Sub Render()
+
+                Select Case Type
+
+                    Case Draw3DType.Corona
+
+                        Dim Factor As Single = Intensity / 100.0F
+
+                        Dim R As Integer = CInt(Red * Factor)
+                        Dim G As Integer = CInt(Green * Factor)
+                        Dim B As Integer = CInt(Blue * Factor)
+
+                        [Call](
+                        "DRAW_CORONA",
+                        Position.X,
+                        Position.Y,
+                        Position.Z,
+                        Radius,
+                        0,
+                        0.0F,
+                        R, G, B)
+
+
+                    Case Draw3DType.Light
+
+                        [Call](
+                        "DRAW_LIGHT_WITH_RANGE",
+                        Position.X,
+                        Position.Y,
+                        Position.Z,
+                        Red, Green, Blue,
+                        LightIntensity,
+                        Range)
+
+                        If CoronaRadius > 0.0F AndAlso
+                       CoronaIntensity > 0.0F Then
+
+                            Dim Factor As Single =
+                            CoronaIntensity / 100.0F
+
+                            [Call](
+                            "DRAW_CORONA",
+                            Position.X,
+                            Position.Y,
+                            Position.Z,
+                            CoronaRadius,
+                            0,
+                            0.0F,
+                            CInt(Red * Factor),
+                            CInt(Green * Factor),
+                            CInt(Blue * Factor))
+
+                        End If
+
+
+                    Case Draw3DType.Arrow
+
+                        [Call](
+                        "DRAW_COLOURED_CYLINDER",
+                        Position.X,
+                        Position.Y,
+                        Position.Z,
+                        Unknown01,
+                        Unknown02,
+                        Color.Red,
+                        Color.Green,
+                        Color.Blue,
+                        Color.Alpha)
+
+
+                    Case Draw3DType.Checkpoint
+
+                        If UseSphere Then
+
+                            [Call](
+                            "DRAW_SPHERE",
+                            Position.X,
+                            Position.Y,
+                            Position.Z,
+                            Radius)
+
+                        Else
+
+                            [Call](
+                            "DRAW_CHECKPOINT_WITH_ALPHA",
+                            Position.X,
+                            Position.Y,
+                            Position.Z,
+                            Radius,
+                            Color.Red,
+                            Color.Green,
+                            Color.Blue,
+                            Color.Alpha)
+
+                        End If
+                End Select
+
+            End Sub
+            Public Sub MarkRendered()
+                If HasRendered Then Return
+
+                StartTime = NativeTimer.TotalGameTime
+                HasRendered = True
+            End Sub
+
+            Public ReadOnly Property IsExpired As Boolean
+                Get
+                    Return HasRendered AndAlso (NativeTimer.TotalGameTime - StartTime >= Duration)
+                End Get
+            End Property
+
+        End Class
+
+        Private Class BigPrintRequest
+
+            Public ReadOnly Text As String
+            Public ReadOnly Duration As Integer
+            Public ReadOnly Type As BigPrintType
+
+            Public ReadOnly Position As Vector2
+            Public ReadOnly Style As TextStyle
+
+            Public StartTime As Integer
+
+
+            Public Sub New(
+            Text As String,
+            Duration As Integer,
+            Type As BigPrintType,
+            Position As Vector2,
+            Style As TextStyle)
+
+                Me.Text = If(Text, String.Empty)
+                Me.Duration = Duration
+                Me.Type = Type
+                Me.Position = Position
+                Me.Style = Style
+
+                StartTime = NativeTimer.TotalGameTime
+
+            End Sub
+
+
+            Public ReadOnly Property IsExpired As Boolean
+                Get
+                    Return NativeTimer.TotalGameTime - StartTime >= Duration
+                End Get
+            End Property
+
+        End Class
+
     End Class
+    Private Shared Function CalculateTextBackgroundPosition(
+    Position As Vector2,
+    BackgroundSize As Vector2,
+    StyleJustification As Justification,
+    WrapStart As Single,
+    WrapEnd As Single,
+    Optional HorizontalPadding As Single = 0.0F) As Vector2
+
+        Dim Result As Vector2 = Position
+        Select Case StyleJustification
+            Case Justification.Center
+            Case Justification.Right
+                Result.X -= BackgroundSize.X / 2.0F
+                Result.X += HorizontalPadding
+            Case Justification.Justify
+                Result.X = (WrapStart + WrapEnd) / 2.0F
+            Case Else
+                Result.X += BackgroundSize.X / 2.0F
+                Result.X -= HorizontalPadding
+        End Select
+        Result.Y += BackgroundSize.Y / 2.0F - BackgroundVerticalPadding
+        Return Result
+    End Function
+
+    Private Shared Function SplitTextAtLineBreak(Text As String) As String()
+        Return If(Text, String.Empty).Split(
+        New String() {TextColors.FX_LineBreak},
+        StringSplitOptions.None)
+    End Function
+    Private Shared Function GetLiteralTextLineWidth(TextLine As String) As Single
+        If String.IsNullOrEmpty(TextLine) Then Return 0.0F
+
+        Return [Call](Of Single)(
+        "GET_STRING_WIDTH_WITH_STRING",
+        "STRING",
+        TextLine)
+    End Function
+    Private Shared Function GetLiteralTextLineCount(
+    TextLine As String,
+    StartPos As Single,
+    EndPos As Single) As Integer
+
+        ' Anche una linea vuota occupa una riga verticale.
+        If String.IsNullOrEmpty(TextLine) Then Return 1
+
+        Return Math.Max(
+        1,
+        [Call](Of Integer)(
+            "GET_NUMBER_LINES_WITH_LITERAL_STRINGS",
+            StartPos,
+            EndPos,
+            "STRING",
+            "",
+            TextLine))
+    End Function
+    Private Shared Sub RenderLiteralTextLines(
+    TextLines As String(),
+    Position As Vector2,
+    Style As TextStyle,
+    Wrap As (StartPos As Single?, EndPos As Single?, LineHeightMultiplier As Single?),
+    Optional ViewportID As Integer? = Nothing,
+    Optional RenderID As Integer? = Nothing,
+    Optional PrecalculatedLineCounts As Integer() = Nothing)
+
+        If TextLines Is Nothing OrElse TextLines.Length = 0 Then Return
+
+        Dim StartPos As Single =
+        If(Wrap.StartPos.HasValue, Wrap.StartPos.Value, 0.0F)
+
+        Dim EndPos As Single =
+        If(Wrap.EndPos.HasValue, Wrap.EndPos.Value, 1.0F)
+
+        Dim LineHeightMultiplier As Single =
+        If(
+            Wrap.LineHeightMultiplier.HasValue,
+            ClampFloat(Wrap.LineHeightMultiplier.Value, 0.7F, 10.0F),
+            1.0F)
+
+        Dim CurrentY As Single = Position.Y
+
+        For i As Integer = 0 To TextLines.Length - 1
+
+            ' Reimposta lo stile prima di ogni chiamata nativa.
+            Dim SingleLineHeight As Single =
+            TextStyle.SetTextStyle(
+                Style,
+                Wrap,
+                ViewportID,
+                RenderID)
+
+            Dim CurrentLineCount As Integer
+
+            If PrecalculatedLineCounts IsNot Nothing AndAlso
+           i < PrecalculatedLineCounts.Length Then
+
+                CurrentLineCount = PrecalculatedLineCounts(i)
+
+            Else
+
+                CurrentLineCount = GetLiteralTextLineCount(
+                TextLines(i),
+                StartPos,
+                EndPos)
+
+            End If
+
+            [Call](
+            "DISPLAY_TEXT_WITH_LITERAL_STRING",
+            Position.X,
+            CurrentY,
+            "STRING",
+            TextLines(i))
+
+            ' Avanza anche di più righe se il segmento va a capo
+            ' automaticamente all'interno del Wrap.
+            CurrentY +=
+            SingleLineHeight *
+            LineHeightMultiplier *
+            CurrentLineCount
+
+        Next
+
+    End Sub
+    '=============================================================================================================================
+    ' Debug Grid
+    '--------------------
+    Private Shared _drawDebugGrid As Boolean = False
+    Private Shared _gridCenter As New Vector2(0.5F, 0.5F)
+    Friend Shared Property GridCenter As Vector2
+        Get
+            Return _gridCenter
+        End Get
+        Set(value As Vector2)
+            _gridCenter = ClampGridPosition(value)
+        End Set
+    End Property
+
+    Private Shared ReadOnly GridColor As New ColorRGBA(0, 255, 0, 90)
+    Private Const MainLineLength As Single = 0.2F
+    Private Const MainLineThickness As Single = 0.0025F
+
+    Private Shared ReadOnly GridCenterMarkerColor As New ColorRGBA(255, 0, 0, 255)
+    Private Shared ReadOnly GridMediumStepMarkerColor As New ColorRGBA(255, 130, 0, 180)
+    Private Shared ReadOnly GridMajorStepMarkerColor As New ColorRGBA(255, 220, 0, 180)
+    Private Const GridCenterMarkerSize As Single = MainLineThickness / 2
+
+    Private Const MinorStep As Single = 0.01F
+    Private Const MinorThickness As Single = 0.0009F
+    Private Const MinorLength As Single = 0.015F
+    Private Const MediumStep As Single = 0.05F
+    Private Const MediumThickness As Single = 0.0018F
+    Private Const MediumLength As Single = 0.028F
+    Private Const MajorStep As Single = 0.1F
+    Private Const MajorThickness As Single = 0.002F
+    Private Const MajorLength As Single = 0.04F '+ (MajorThickness / 2)
+
+    Private Const MovementSpeed As Single = 0.2F
+    Private Const SlowMovementSpeed As Single = 0.04F
+
+    Private Shared _lastUpdate As DateTime = DateTime.UtcNow
+    Private Shared _tickRegistered As Boolean = False
+    Private Shared TextStyleLabels As New TextStyle(New ColorRGBA(0, 230, 0, 255), 9, Justification.Center, ColorRGBA.Black, TextStyle.Fonts.Dotted)
+    Private Shared TextStyleCoords As New TextStyle(New ColorRGBA(0, 230, 0, 255), 12, Justification.Center, ColorRGBA.Black, TextStyle.Fonts.Narrow,, 1.4)
+    Private Shared Sub StartDebugGrid()
+        If _tickRegistered Then Return
+
+        _lastUpdate = DateTime.UtcNow
+        TickHelper.Add_Internal(AddressOf DebugGridTick)
+        _tickRegistered = True
+    End Sub
+    Private Shared Sub StopDebugGrid()
+        If Not _tickRegistered Then Return
+
+        TickHelper.Remove_Internal(AddressOf DebugGridTick)
+        _tickRegistered = False
+    End Sub
+    Private Shared Sub DebugGridTick()
+        If Not _drawDebugGrid Then Return
+
+        Dim now As DateTime = DateTime.UtcNow
+        Dim deltaTime As Single = CSng((now - _lastUpdate).TotalSeconds)
+        _lastUpdate = now
+
+        If deltaTime < 0.0F Then
+            deltaTime = 0.0F
+        ElseIf deltaTime > 0.1F Then
+            deltaTime = 0.1F
+        End If
+
+        UpdateGridPosition(deltaTime)
+        DrawGrid()
+    End Sub
+    Private Shared Sub UpdateGridPosition(deltaTime As Single)
+        Dim speed As Single = MovementSpeed
+        If NativeControls.IsKeyPressed(Windows.Forms.Keys.LShiftKey, False) Then
+            speed = SlowMovementSpeed
+        End If
+
+        Dim amount As Single = speed * deltaTime
+
+        Dim x As Single = _gridCenter.X
+        Dim y As Single = _gridCenter.Y
+
+        If NativeControls.IsKeyPressed(Windows.Forms.Keys.Up, False) OrElse NativeControls.IsKeyPressed(Windows.Forms.Keys.NumPad8, False) Then
+            y -= amount
+        End If
+
+        If NativeControls.IsKeyPressed(Windows.Forms.Keys.Down, False) OrElse NativeControls.IsKeyPressed(Windows.Forms.Keys.NumPad2, False) Then
+            y += amount
+        End If
+
+        If NativeControls.IsKeyPressed(Windows.Forms.Keys.Left, False) OrElse NativeControls.IsKeyPressed(Windows.Forms.Keys.NumPad4, False) Then
+            x -= amount
+        End If
+
+        If NativeControls.IsKeyPressed(Windows.Forms.Keys.Right, False) OrElse NativeControls.IsKeyPressed(Windows.Forms.Keys.NumPad6, False) Then
+            x += amount
+        End If
+
+        _gridCenter = ClampGridPosition(New Vector2(x, y))
+    End Sub
+    Private Shared Sub ResetGridPosition()
+        _gridCenter = New Vector2(0.5F, 0.5F)
+    End Sub
+    Private Shared Function ClampGridPosition(position As Vector2) As Vector2
+        Dim x As Single = position.X
+        Dim y As Single = position.Y
+
+        If x < 0.0F Then
+            x = 0.0F
+        ElseIf x > 1.0F Then
+            x = 1.0F
+        End If
+
+        If y < 0.0F Then
+            y = 0.0F
+        ElseIf y > 1.0F Then
+            y = 1.0F
+        End If
+
+        Return New Vector2(x, y)
+    End Function
+    '============================================================
+    'DRAW
+    '=========================
+    Private Shared Sub DrawGrid()
+        Dim centerX As Single = _gridCenter.X
+        Dim centerY As Single = _gridCenter.Y
+
+        Dim gridMinX As Single = centerX - (MainLineLength / 2.0F)
+        Dim gridMaxX As Single = centerX + (MainLineLength / 2.0F)
+        Dim gridMinY As Single = centerY - (MainLineLength / 2.0F)
+        Dim gridMaxY As Single = centerY + (MainLineLength / 2.0F)
+
+        Dim i As Integer
+        For i = -10 To 10
+            Dim offset As Single = i * MinorStep
+            Dim x As Single = centerX + offset
+
+            If x < 0.0F OrElse x > 1.0F Then
+                Continue For
+            End If
+
+            If i = 0 Then
+                DrawLine(New Vector2(x, centerY), MainLineLength, MainLineThickness, GridColor, Vertical:=True, Center:=True, Duration:=1)
+                Continue For
+            End If
+            Dim absoluteIndex As Integer = Math.Abs(i)
+
+            If absoluteIndex Mod 10 = 0 Then '0.1
+                DrawGridVertical(x, centerY, MajorLength, MajorThickness)
+            ElseIf absoluteIndex Mod 5 = 0 Then '0.5
+                DrawGridVertical(x, centerY, MediumLength, MediumThickness)
+            Else '0.01
+                DrawGridVertical(x, centerY, MinorLength, MinorThickness)
+            End If
+        Next
+
+        For i = -10 To 10
+            Dim offset As Single = i * MinorStep
+            Dim y As Single = centerY + offset
+
+            If y < 0.0F OrElse y > 1.0F Then
+                Continue For
+            End If
+
+            If i = 0 Then
+                DrawLine(New Vector2(centerX, y), MainLineLength, MainLineThickness, GridColor, Vertical:=False, Center:=True, Duration:=1)
+                Continue For
+            End If
+            Dim absoluteIndex As Integer = Math.Abs(i)
+
+            If absoluteIndex Mod 10 = 0 Then '0.1
+                DrawGridHorizontal(centerX, y, MajorLength, MajorThickness)
+            ElseIf absoluteIndex Mod 5 = 0 Then '0.5
+                DrawGridHorizontal(centerX, y, MediumLength, MediumThickness)
+            Else '0.01
+                DrawGridHorizontal(centerX, y, MinorLength, MinorThickness)
+            End If
+        Next
+
+        'Center marker
+        DrawSquare(New Vector2(centerX, centerY), MajorThickness * 1.5, GridCenterMarkerColor, Duration:=1)
+        'Medium step markers
+        DrawSquare(New Vector2(centerX - 0.05, centerY), MajorThickness, GridMediumStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX + 0.05, centerY), MajorThickness, GridMediumStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX, centerY + 0.05), MajorThickness, GridMediumStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX, centerY - 0.05), MajorThickness, GridMediumStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX - 0.05, centerY - 0.05), MajorThickness, GridMediumStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX + 0.05, centerY - 0.05), MajorThickness, GridMediumStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX - 0.05, centerY + 0.05), MediumThickness, GridMediumStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX + 0.05, centerY + 0.05), MediumThickness, GridMediumStepMarkerColor, Duration:=1)
+        'Major step markers
+        DrawSquare(New Vector2(centerX - 0.1, centerY), MediumThickness * 1.5, GridMajorStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX + 0.1, centerY), MediumThickness * 1.5, GridMajorStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX, centerY + 0.1), MediumThickness * 1.5, GridMajorStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX, centerY - 0.1), MediumThickness * 1.5, GridMajorStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX - 0.1, centerY - 0.1), MediumThickness * 1.5, GridMajorStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX + 0.1, centerY - 0.1), MediumThickness * 1.5, GridMajorStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX - 0.1, centerY + 0.1), MediumThickness * 1.5, GridMajorStepMarkerColor, Duration:=1)
+        DrawSquare(New Vector2(centerX + 0.1, centerY + 0.1), MediumThickness * 1.5, GridMajorStepMarkerColor, Duration:=1)
+
+        DrawXLabel(centerX - 0.0935F, centerY, -0.1F)
+        DrawXLabel(centerX + 0.0935F, centerY, 0.1F)
+        DrawYLabel(centerX, centerY - 0.1F, -0.1F)
+        DrawYLabel(centerX, centerY + 0.09F, 0.1F)
+
+        Dim centerText As String = String.Format("X: {0:0.000}    Y: {1:0.000}", centerX, centerY)
+        DrawText(centerText, Duration:=1, PositionPercent:=New Vector2(0.5F, 0.977F), Style:=TextStyleCoords)
+    End Sub
+    Private Shared Sub DrawGridVertical(
+        x As Single,
+        centerY As Single,
+        length As Single,
+        thickness As Single)
+
+        DrawLine(
+            New Vector2(x, centerY),
+            length,
+            thickness,
+            GridColor,
+            Vertical:=True,
+            Center:=True,
+            Duration:=1)
+
+    End Sub
+    Private Shared Sub DrawGridHorizontal(
+        centerX As Single,
+        y As Single,
+        length As Single,
+        thickness As Single)
+
+        DrawLine(
+            New Vector2(centerX, y),
+            length,
+            thickness,
+            GridColor,
+            Vertical:=False,
+            Center:=True,
+            Duration:=1)
+
+    End Sub
+    Private Shared Sub DrawXLabel(x As Single, y As Single, value As Single)
+        If x < -0.0F OrElse x > 1.0F Then Return
+
+        Dim label As String
+        If value > 0.0F Then label = "+" & value.ToString("0.0") Else label = value.ToString("0.0")
+
+        Dim textY As Single = y + 0.012F
+        If textY > 1.0F Then textY = y - 0.012F
+        DrawText(label, Duration:=1, PositionPercent:=New Vector2(x, textY), Style:=TextStyleLabels)
+    End Sub
+    Private Shared Sub DrawYLabel(x As Single, y As Single, value As Single)
+        If y < 0.0F OrElse y > 1.0F Then Return
+
+        Dim label As String
+        If value > 0.0F Then label = "+" & value.ToString("0.00") Else label = value.ToString("0.00")
+
+        Dim textX As Single = x + 0.015F
+        If textX > 1.0F Then textX = x - 0.015F
+
+        DrawText(label, Duration:=1, PositionPercent:=New Vector2(textX, y), Style:=TextStyleLabels)
+    End Sub
+    '============================================================
+    '=============================================================================================================================
+    Friend Shared Function DrawText_Internal(Text As String, Optional Duration As Integer = 3000, Optional PositionPercent As Vector2 = Nothing, Optional Style As TextStyle = Nothing,
+                                 Optional Wrap As (Length As Single?, LineHeightMultiplier As Single?) = Nothing, Optional ViewportID As Integer? = Nothing,
+                                 Optional RenderID As Integer? = Nothing, Optional MeasureOnly As Boolean = False) As (Width As Single, Height As Single, LineCount As Integer)
+
+        Dim FinalText As String = If(Text, String.Empty)
+        Dim FinalStyle As TextStyle
+        If Style Is Nothing Then FinalStyle = TextStyle.Default Else FinalStyle = Style
+
+        If PositionPercent = Nothing Then PositionPercent = New Vector2(0.5F, 0.9F)
+
+        Dim X As Single = PositionPercent.X
+        Dim FinalWrap As (StartPos As Single, EndPos As Single, LineHeightMultiplier As Single)
+
+        If Wrap.LineHeightMultiplier.HasValue Then
+            FinalWrap.LineHeightMultiplier =
+         ClampFloat(Wrap.LineHeightMultiplier.Value, 0.7F, 10.0F)
+        Else
+            FinalWrap.LineHeightMultiplier = 1.0F
+        End If
+
+        If Wrap.Length.HasValue Then
+            Dim RequestedLength As Single = Math.Max(0.0F, Wrap.Length.Value)
+
+            Select Case FinalStyle.Justification
+                Case Justification.Center
+                    FinalWrap.StartPos = X - (RequestedLength / 2.0F)
+                    FinalWrap.EndPos = X + (RequestedLength / 2.0F)
+
+                Case Justification.Right
+                    FinalWrap.StartPos = X - RequestedLength
+                    FinalWrap.EndPos = X
+
+                Case Justification.Justify
+                    FinalWrap.StartPos = X
+                    FinalWrap.EndPos = X + RequestedLength
+
+                Case Else
+                    FinalWrap.StartPos = X
+                    FinalWrap.EndPos = X + RequestedLength
+            End Select
+        Else
+            FinalWrap.StartPos = 0.0F
+            FinalWrap.EndPos = 1.0F
+        End If
+
+        Dim SingleLineHeight As Single = 0.0F
+        SingleLineHeight = TextStyle.SetTextStyle(FinalStyle, FinalWrap, ViewportID, RenderID)
+
+        Dim ExplicitLines As String() = Nothing
+        Dim ExplicitLineCounts As Integer() = Nothing
+
+        Dim StringWidth As Single = 0.0F
+        Dim NumberOfLines As Integer = 0
+
+        If FinalText.IndexOf(TextColors.FX_LineBreak, StringComparison.Ordinal) >= 0 Then
+
+            ExplicitLines = SplitTextAtLineBreak(FinalText)
+
+            ReDim ExplicitLineCounts(ExplicitLines.Length - 1)
+
+            For i As Integer = 0 To ExplicitLines.Length - 1
+
+                Dim CurrentWidth As Single =
+            GetLiteralTextLineWidth(ExplicitLines(i))
+
+                StringWidth = Math.Max(StringWidth, CurrentWidth)
+
+                ExplicitLineCounts(i) = GetLiteralTextLineCount(
+            ExplicitLines(i),
+            FinalWrap.StartPos,
+            FinalWrap.EndPos)
+
+                NumberOfLines += ExplicitLineCounts(i)
+
+            Next
+
+        Else
+
+            ' Mantiene invariato il comportamento per il testo
+            ' che non contiene line break espliciti.
+            StringWidth =
+        [Call](Of Single)(
+            "GET_STRING_WIDTH_WITH_STRING",
+            "STRING",
+            FinalText)
+
+            If FinalText.Length > 0 Then
+
+                NumberOfLines =
+            [Call](Of Integer)(
+                "GET_NUMBER_LINES_WITH_LITERAL_STRINGS",
+                FinalWrap.StartPos,
+                FinalWrap.EndPos,
+                "STRING",
+                "",
+                FinalText)
+
+                NumberOfLines = Math.Max(1, NumberOfLines)
+
+            End If
+
+        End If
+
+        Dim TotalHeight As Single = CSng(NumberOfLines) * (SingleLineHeight * FinalWrap.LineHeightMultiplier)
+        Dim BackgroundSize As New Vector2(0.0F, 0.0F)
+        Dim BackgroundPosition As Vector2? = Nothing
+
+        If FinalStyle.Background.Alpha > 0 AndAlso NumberOfLines > 0 Then
+
+            Dim BackgroundWidth As Single
+
+            If FinalStyle.Justification = NativeDraws.Justification.Justify Then
+
+                ' L'intero wrap, non soltanto la larghezza del testo.
+                BackgroundWidth = Math.Max(
+         0.0F,
+         FinalWrap.EndPos - FinalWrap.StartPos)
+
+            Else
+
+                BackgroundWidth = Math.Max(0.0F, StringWidth)
+
+                If Wrap.Length.HasValue AndAlso Wrap.Length.Value > 0.0F Then
+                    BackgroundWidth = Math.Min(
+             BackgroundWidth,
+             Wrap.Length.Value)
+                End If
+
+            End If
+
+            BackgroundSize = New Vector2(
+     BackgroundWidth + (BackgroundHorizontalPadding * 2.0F),
+     TotalHeight + (BackgroundVerticalPadding * 2.0F))
+
+            If BackgroundSize.X > 0.0F Then
+
+                BackgroundPosition = CalculateTextBackgroundPosition(
+         PositionPercent,
+         BackgroundSize,
+         FinalStyle.Justification,
+         FinalWrap.StartPos,
+         FinalWrap.EndPos,
+         HorizontalPadding:=BackgroundHorizontalPadding)
+
+            End If
+
+        End If
+
+        If Not MeasureOnly Then
+            If Duration < 5 Then
+                If BackgroundPosition.HasValue Then DrawRectangle(BackgroundPosition.Value, BackgroundSize, FinalStyle.Background, Duration:=1)
+
+                If ExplicitLines IsNot Nothing Then
+
+                    RenderLiteralTextLines(
+        ExplicitLines,
+        PositionPercent,
+        FinalStyle,
+        FinalWrap,
+        ViewportID,
+        RenderID,
+        ExplicitLineCounts)
+
+                Else
+
+                    TextStyle.SetTextStyle(
+        FinalStyle,
+        FinalWrap,
+        ViewportID,
+        RenderID)
+
+                    [Call](
+        "DISPLAY_TEXT_WITH_LITERAL_STRING",
+        PositionPercent.X,
+        PositionPercent.Y,
+        "STRING",
+        FinalText)
+
+                End If
+            Else
+                DrawManager.DrawText(FinalText, Duration, PositionPercent, FinalStyle, BackgroundSize, FinalWrap, ViewportID, RenderID, BackgroundPosition)
+            End If
+        End If
+        Return (Width:=StringWidth, Height:=TotalHeight, LineCount:=NumberOfLines)
+    End Function
 
 End Class
-
-'Public Shared Function AddSphere(Coordinates As GTA.Vector3, Radius As Single, Unknown As Integer) As Integer
-'    Return [Call](Of Integer)("ADD_SPHERE", Coordinates.X, Coordinates.Y, Coordinates.Z, Radius, Unknown)
-'End Function
-'Public Shared Sub DrawSphere(X As Single, Y As Single, Z As Single, Radius As Single)
-'    [Call]("DRAW_SPHERE", X, Y, Z, Radius)
-'End Sub
